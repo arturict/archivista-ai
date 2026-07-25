@@ -1,24 +1,29 @@
 import { apiError, ApiError, requireApiUser } from '@/lib/server/auth';
 import { workspaceFor } from '@/lib/server/workspace';
-
-// The durable queue remains a CommonJS backend service shared with Express.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const reviewService = require('../../../../services/reviewService') as {
-  listPendingSuggestions(limit?: number): Promise<unknown[]>;
-  isReviewModeEnabled(): boolean;
-};
+import { backendBearerHeaders } from '../../../../services/backendProxyAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireApiUser();
+    const backend = process.env.TAGVICO_BACKEND_URL || 'http://127.0.0.1:3001';
+    const response = await fetch(`${backend}/api/review-queue`, {
+      headers: backendBearerHeaders(request),
+      cache: 'no-store',
+      redirect: 'manual'
+    });
+    if (!response.ok) {
+      throw new ApiError(response.status >= 500 ? 502 : response.status, 'The review queue is unavailable.');
+    }
+    const queue = await response.json() as { suggestions?: unknown[]; reviewMode?: boolean };
     return Response.json({
-      suggestions: await reviewService.listPendingSuggestions(100),
-      reviewMode: reviewService.isReviewModeEnabled(),
+      suggestions: queue.suggestions || [],
+      reviewMode: Boolean(queue.reviewMode),
       canMutate: workspaceFor(user).role !== 'viewer'
     });
   } catch (error) {
+    console.error('[review-queue] Could not list pending suggestions:', error);
     return apiError(error instanceof ApiError ? error : new ApiError(500, 'The review queue is unavailable.'));
   }
 }

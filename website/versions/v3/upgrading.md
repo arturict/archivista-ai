@@ -45,11 +45,17 @@ typed Settings API. `/settings` now redirects into the single Next.js settings
 workspace; the removed EJS settings form is not a rollback or compatibility
 surface.
 
-Legacy bookmarks redirect into the task-oriented 3.1 information architecture:
+Legacy bookmarks redirect into the task-oriented v3 information architecture:
 `/dashboard` to `/automation`, `/history` to `/activity`, `/operations` to
 `/automation/recovery`, and `/manual` to `/automation/manual`. `/review`
 remains the clear approval destination. Their former EJS views and page-specific
 browser scripts have been retired.
+
+From 3.2 onward, `/automation` is labelled **Home**, `/documents` provides a
+document-first history view, and `/tags` contains the dedicated duplicate-tag
+review flow. These are navigation and presentation changes; existing history,
+conversations, provider credentials, automation rules and recovery queues stay
+in the same v3 data volume.
 
 ## Roll back
 

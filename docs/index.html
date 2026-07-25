@@ -8,30 +8,71 @@
       name="description"
       content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
     >
-    <meta name="theme-color" content="#0d0f0b">
-    <meta name="robots" content="index,follow">
-    <link rel="icon" href="favicon.ico" sizes="any">
+    <meta name="application-name" content="Tagvico">
+    <meta name="author" content="Tagvico maintainers">
+    <meta
+      name="keywords"
+      content="Paperless-ngx, self-hosted document management, document automation, Ollama, automatic tagging, document chat"
+    >
+    <meta name="theme-color" content="#f5f2e8">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+    <link rel="canonical" href="https://tagvico.arturf.ch/">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/tagvico-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Tagvico">
+    <meta property="og:title" content="Tagvico — Turn your Paperless archive into useful work">
+    <meta
+      property="og:description"
+      content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
+    >
+    <meta property="og:url" content="https://tagvico.arturf.ch/">
+    <meta property="og:image" content="https://tagvico.arturf.ch/tagvico-icon.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Tagvico — Turn your Paperless archive into useful work">
+    <meta
+      name="twitter:description"
+      content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
+    >
+    <meta name="twitter:image" content="https://tagvico.arturf.ch/tagvico-icon.png">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Tagvico",
+        "applicationCategory": "DocumentManagementApplication",
+        "operatingSystem": "Docker",
+        "softwareVersion": "3.2.0",
+        "description": "Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx.",
+        "url": "https://tagvico.arturf.ch/",
+        "downloadUrl": "https://github.com/arturict/tagvico-ai/releases",
+        "codeRepository": "https://github.com/arturict/tagvico-ai",
+        "license": "https://github.com/arturict/tagvico-ai/blob/main/LICENSE"
+      }
+    </script>
     <style>
       :root {
-        --bg: #0d0f0b;
-        --surface: #12150f;
-        --surface-2: #171a13;
-        --surface-3: #10130d;
-        --line: #2a2d24;
-        --line-strong: #3b412f;
-        --text: #f7f2e8;
-        --muted: #b8b3a4;
-        --accent: #c8ff2e;
-        --accent-strong: #a5d624;
-        --accent-soft: rgba(200, 255, 46, 0.14);
-        --success: #8fd33f;
-        --warning: #f2bd55;
-        --danger: #f37b78;
-        --radius-sm: 10px;
-        --radius: 14px;
-        --radius-lg: 22px;
-        --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
-        --page: 1180px;
+        --bg: #f5f2e8;
+        --surface: #fffdf7;
+        --surface-2: #f1efe4;
+        --surface-3: #e8e6d8;
+        --line: #cbcbb8;
+        --line-strong: #9ca183;
+        --text: #172218;
+        --muted: #667060;
+        --pine: #193c2c;
+        --moss: #65774d;
+        --accent: #b8ed31;
+        --accent-strong: #96c922;
+        --accent-soft: rgba(139, 177, 49, 0.14);
+        --success: #3f7d54;
+        --warning: #ac7627;
+        --danger: #b84b42;
+        --radius-sm: 7px;
+        --radius: 10px;
+        --radius-lg: 14px;
+        --shadow: 0 18px 50px rgba(42, 54, 37, 0.1), 0 2px 8px rgba(42, 54, 37, 0.06);
+        --page: 1220px;
       }
 
       * {
@@ -40,7 +81,7 @@
 
       html {
         scroll-behavior: smooth;
-        color-scheme: dark;
+        color-scheme: light;
         background: var(--bg);
       }
 
@@ -51,9 +92,10 @@
         overflow-x: hidden;
         color: var(--text);
         background:
-          radial-gradient(circle at 85% -8%, rgba(200, 255, 46, 0.1), transparent 31rem),
-          radial-gradient(circle at 5% 38%, rgba(200, 255, 46, 0.035), transparent 28rem),
+          linear-gradient(rgba(25, 60, 44, .024) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(25, 60, 44, .024) 1px, transparent 1px),
           var(--bg);
+        background-size: 34px 34px;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         line-height: 1.55;
         -webkit-font-smoothing: antialiased;
@@ -315,17 +357,19 @@
         background: var(--accent-soft);
       }
 
-      .nav-dot {
-        width: 8px;
-        height: 8px;
+      .nav-icon {
+        width: 15px;
+        height: 15px;
         flex: 0 0 auto;
-        border: 1px solid currentColor;
-        border-radius: 3px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
-      .window-nav .active .nav-dot {
-        border-color: var(--accent);
-        background: var(--accent);
+      .window-nav .active .nav-icon {
+        color: var(--accent);
       }
 
       .window-user {
@@ -1073,6 +1117,826 @@
         }
       }
 
+      /* Tagvico 3.2 · Paper & Pine */
+      .site-header {
+        border-bottom-color: rgba(203, 203, 184, .9);
+        background: rgba(245, 242, 232, .9);
+      }
+
+      .brand {
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 1.2rem;
+      }
+
+      .site-nav a {
+        border-radius: 7px;
+        color: var(--muted);
+      }
+
+      .site-nav a:hover,
+      .site-nav a:focus-visible {
+        background: var(--surface-2);
+        color: var(--pine);
+      }
+
+      .site-nav .nav-docs {
+        border-color: var(--line);
+        background: var(--surface);
+        color: var(--pine);
+      }
+
+      .site-nav .nav-github {
+        border-color: var(--pine);
+        background: var(--pine);
+        color: white;
+      }
+
+      .release-note {
+        border-bottom-color: var(--line);
+        background: var(--surface-2);
+        color: var(--muted);
+      }
+
+      .release-pill {
+        border-color: color-mix(in srgb, var(--pine) 18%, var(--line));
+        background: var(--pine);
+        color: white;
+      }
+
+      .hero {
+        border-bottom-color: var(--line);
+        padding: clamp(76px, 10vw, 132px) 0 86px;
+      }
+
+      .hero::before {
+        opacity: .48;
+        background:
+          radial-gradient(circle at 78% 25%, rgba(184, 237, 49, .18), transparent 25rem),
+          radial-gradient(circle at 16% 78%, rgba(101, 119, 77, .1), transparent 24rem);
+      }
+
+      .hero-copy {
+        width: min(850px, 100%);
+        margin-inline: auto;
+        text-align: center;
+      }
+
+      .hero h1,
+      .section-head h2,
+      .feature-copy h2,
+      .docs-callout h2,
+      .install-copy h2 {
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 500;
+        letter-spacing: -.055em;
+      }
+
+      .hero h1 {
+        max-width: 930px;
+        margin-inline: auto;
+        font-size: clamp(3.65rem, 8vw, 7.3rem);
+        line-height: .9;
+      }
+
+      .hero h1 span {
+        color: var(--moss);
+      }
+
+      .hero-lede {
+        max-width: 720px;
+        margin-inline: auto;
+        color: var(--muted);
+        font-size: clamp(1rem, 1.5vw, 1.2rem);
+      }
+
+      .hero .actions {
+        justify-content: center;
+      }
+
+      .eyebrow {
+        color: var(--moss);
+        letter-spacing: .17em;
+      }
+
+      .button {
+        border-color: var(--line);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--pine);
+        box-shadow: 0 1px 0 rgba(25, 60, 44, .05);
+      }
+
+      .button:hover,
+      .button:focus-visible {
+        border-color: var(--line-strong);
+        background: var(--surface-2);
+      }
+
+      .button.primary {
+        border-color: var(--pine);
+        background: var(--pine);
+        color: white;
+      }
+
+      .button.primary:hover,
+      .button.primary:focus-visible {
+        background: #214c38;
+      }
+
+      .button.primary span {
+        color: var(--accent);
+      }
+
+      .product-window {
+        margin-top: 64px;
+        border-color: var(--line-strong);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: 0 34px 90px rgba(42, 54, 37, .15);
+      }
+
+      .window-sidebar {
+        border-color: var(--line);
+        background: #edeade;
+      }
+
+      .window-brand {
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+
+      .window-nav span {
+        border-color: transparent;
+        color: var(--muted);
+      }
+
+      .window-nav span.active {
+        border-color: var(--pine);
+        background: var(--pine);
+        color: white;
+      }
+
+      .window-user,
+      .window-heading,
+      .composer {
+        border-color: var(--line);
+      }
+
+      .window-content {
+        background: var(--surface);
+      }
+
+      .window-heading h2,
+      .workflow-card h3,
+      .architecture-card h3 {
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+
+      .model-chip,
+      .tool-trace,
+      .approval-card,
+      .composer {
+        border-color: var(--line);
+        background: var(--surface-2);
+        color: var(--pine);
+      }
+
+      .model-chip i,
+      .tool-status {
+        color: var(--success);
+      }
+
+      .bubble {
+        border-color: var(--line);
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .bubble.user {
+        border-color: color-mix(in srgb, var(--pine) 24%, var(--line));
+        background: #dfe8dc;
+      }
+
+      section {
+        border-color: var(--line);
+      }
+
+      .section-head p,
+      .feature-copy > p,
+      .install-copy > p {
+        color: var(--muted);
+      }
+
+      .workflow-card,
+      .architecture-card,
+      .feature-panel,
+      .docs-callout,
+      .install-shell,
+      .code-card {
+        border-color: var(--line);
+        border-radius: var(--radius);
+        background: rgba(255, 253, 247, .95);
+        box-shadow: var(--shadow);
+      }
+
+      .workflow-card {
+        border-top: 3px solid var(--moss);
+      }
+
+      .workflow-index {
+        color: var(--moss);
+      }
+
+      .feature-panel {
+        background: var(--surface);
+      }
+
+      .panel-head,
+      .picker-row,
+      .merge-row,
+      .code-head {
+        border-color: var(--line);
+      }
+
+      .picker-row,
+      .merge-row {
+        background: var(--surface);
+      }
+
+      .picker-row.selected {
+        border-color: color-mix(in srgb, var(--pine) 28%, var(--line));
+        background: #e4ebdd;
+      }
+
+      .provider-mark,
+      .check,
+      .signal {
+        border-color: var(--line);
+        background: var(--pine);
+        color: var(--accent);
+      }
+
+      .configured {
+        border-color: color-mix(in srgb, var(--success) 32%, var(--line));
+        background: #e6f1e5;
+        color: var(--success);
+      }
+
+      .tag,
+      .merge-result,
+      .mini-button {
+        border-color: var(--line);
+        background: var(--surface-2);
+        color: var(--pine);
+      }
+
+      .mini-button.approve {
+        border-color: var(--pine);
+        background: var(--pine);
+        color: white;
+      }
+
+      .docs-callout {
+        background: var(--pine);
+      }
+
+      .docs-callout h2,
+      .docs-callout p,
+      .docs-callout .eyebrow {
+        color: white;
+      }
+
+      .docs-callout .eyebrow,
+      .docs-callout .docs-path {
+        color: var(--accent);
+      }
+
+      .docs-callout .button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--pine);
+      }
+
+      .code-card {
+        overflow: hidden;
+        background: var(--pine);
+        color: #f6f3e8;
+      }
+
+      .code-head {
+        color: #d9dfd2;
+      }
+
+      .copy-button {
+        border-color: rgba(255,255,255,.25);
+        background: rgba(255,255,255,.08);
+        color: white;
+      }
+
+      footer {
+        border-color: var(--line);
+        background: #edeade;
+        color: var(--muted);
+      }
+
+      .faq-grid {
+        display: grid;
+        grid-template-columns: .8fr 1.2fr;
+        gap: clamp(28px, 7vw, 90px);
+        align-items: start;
+      }
+
+      .faq-intro h2 {
+        margin: 10px 0 16px;
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2.4rem, 5vw, 4.6rem);
+        font-weight: 500;
+        letter-spacing: -.055em;
+        line-height: .98;
+      }
+
+      .faq-intro p {
+        color: var(--muted);
+      }
+
+      .faq-list {
+        border-top: 1px solid var(--line);
+      }
+
+      .faq-list details {
+        border-bottom: 1px solid var(--line);
+        padding: 18px 0;
+      }
+
+      .faq-list summary {
+        color: var(--pine);
+        cursor: pointer;
+        font-weight: 720;
+      }
+
+      .faq-list p {
+        max-width: 700px;
+        margin: 12px 28px 0 0;
+        color: var(--muted);
+      }
+
+      /* Landing polish: real Companion hierarchy, legible checks and provider marks */
+      .product-window {
+        max-width: 1160px;
+        min-height: 640px;
+        grid-template-columns: 190px minmax(0, 1fr);
+      }
+
+      .companion-demo {
+        min-width: 0;
+        padding: 0;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .companion-demo .window-heading {
+        min-height: 104px;
+        margin: 0;
+        padding: 22px 24px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .model-chip {
+        padding: 7px 9px 7px 7px;
+        border-radius: 8px;
+        background: white;
+        box-shadow: 0 4px 16px rgba(25, 60, 44, .06);
+      }
+
+      .model-chip .model-icon {
+        width: 25px;
+        height: 25px;
+        display: grid;
+        place-items: center;
+        border-radius: 7px;
+        background: var(--pine);
+      }
+
+      .model-chip .model-icon img {
+        width: 15px;
+        height: 15px;
+        object-fit: contain;
+      }
+
+      .model-chip strong,
+      .model-chip small {
+        display: block;
+      }
+
+      .model-chip strong {
+        color: var(--pine);
+        font-size: .68rem;
+      }
+
+      .model-chip small {
+        margin-top: 1px;
+        color: var(--muted);
+        font-size: .58rem;
+      }
+
+      .companion-demo-grid {
+        min-height: 536px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 270px;
+      }
+
+      .demo-chat {
+        min-width: 0;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        border-right: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .chat-thread {
+        display: grid;
+        align-content: start;
+        gap: 20px;
+        padding: 25px 27px;
+      }
+
+      .question-row {
+        justify-self: end;
+        max-width: 78%;
+        padding: 12px 15px;
+        border: 1px solid color-mix(in srgb, var(--pine) 26%, var(--line));
+        border-radius: 15px 15px 4px 15px;
+        background: #dfe8dc;
+        color: var(--pine);
+        font-size: .75rem;
+        line-height: 1.45;
+      }
+
+      .assistant-answer {
+        max-width: 92%;
+      }
+
+      .assistant-meta {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 11px;
+      }
+
+      .assistant-avatar {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--pine);
+        color: var(--accent);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: .7rem;
+        font-weight: 700;
+      }
+
+      .assistant-meta strong,
+      .assistant-meta small {
+        display: block;
+      }
+
+      .assistant-meta strong {
+        color: var(--pine);
+        font-size: .72rem;
+      }
+
+      .assistant-meta small {
+        color: var(--muted);
+        font-size: .6rem;
+      }
+
+      .assistant-answer > p {
+        margin: 0;
+        color: var(--text);
+        font-size: .77rem;
+        line-height: 1.62;
+      }
+
+      .source-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 13px;
+      }
+
+      .source-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 27px;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-2);
+        color: var(--pine);
+        font-size: .6rem;
+      }
+
+      .source-pill b {
+        width: 16px;
+        height: 16px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #d9e8d6;
+        color: var(--success);
+        font-size: .53rem;
+      }
+
+      .demo-chat .approval-card {
+        max-width: 92%;
+        padding: 13px 14px;
+        border-left: 3px solid var(--moss);
+        background: #f1f1e7;
+      }
+
+      .demo-chat .approval-card p {
+        margin-bottom: 9px;
+      }
+
+      .demo-chat .composer {
+        min-height: 66px;
+        align-items: center;
+        margin: 0 20px 20px;
+        padding: 9px 9px 9px 13px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 6px 22px rgba(25, 60, 44, .07);
+      }
+
+      .composer-copy {
+        min-width: 0;
+      }
+
+      .composer-copy .composer-placeholder {
+        display: block;
+        padding: 0;
+      }
+
+      .composer-meta {
+        margin-top: 3px;
+        color: var(--moss);
+        font-size: .56rem;
+      }
+
+      .send-button {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+        background: var(--pine);
+        color: white;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .research-rail {
+        min-width: 0;
+        padding: 18px;
+        background: #f0eee3;
+      }
+
+      .research-rail-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .research-rail-head span,
+      .research-rail-head strong {
+        display: block;
+      }
+
+      .research-rail-head strong {
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: .92rem;
+      }
+
+      .research-rail-head span {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: .58rem;
+      }
+
+      .research-count {
+        padding: 4px 7px;
+        border: 1px solid #bfd2b7;
+        border-radius: 999px;
+        background: #e4efe0;
+        color: var(--success);
+        font-size: .54rem;
+        font-weight: 760;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+      }
+
+      .research-steps {
+        display: grid;
+        gap: 0;
+        padding: 14px 0 9px;
+      }
+
+      .research-step {
+        position: relative;
+        display: grid;
+        grid-template-columns: 25px minmax(0, 1fr);
+        gap: 9px;
+        padding-bottom: 15px;
+      }
+
+      .research-step:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        top: 23px;
+        bottom: 1px;
+        left: 11px;
+        width: 1px;
+        background: #bdc8b7;
+      }
+
+      .step-icon {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--pine);
+        color: var(--accent);
+        font-size: .62rem;
+        font-weight: 850;
+        line-height: 1;
+      }
+
+      .research-step strong,
+      .research-step small {
+        display: block;
+      }
+
+      .research-step strong {
+        padding-top: 2px;
+        color: var(--pine);
+        font-size: .65rem;
+      }
+
+      .research-step small {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: .56rem;
+        line-height: 1.4;
+      }
+
+      .source-stack {
+        display: grid;
+        gap: 7px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .source-stack-label {
+        color: var(--moss);
+        font-size: .55rem;
+        font-weight: 760;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .source-card {
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .source-card strong,
+      .source-card small {
+        display: block;
+      }
+
+      .source-card strong {
+        color: var(--pine);
+        font-size: .62rem;
+      }
+
+      .source-card small {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: .54rem;
+      }
+
+      .feature-item > .check {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        align-self: start;
+        border: 1px solid color-mix(in srgb, var(--pine) 75%, black);
+        border-radius: 8px;
+        background: var(--pine);
+        color: var(--accent);
+        font-size: 0;
+        line-height: 1;
+        box-shadow: 0 4px 10px rgba(25, 60, 44, .12);
+      }
+
+      .feature-item > .check::before {
+        content: "✓";
+        display: block;
+        color: var(--accent);
+        font-size: .82rem;
+        font-weight: 900;
+        line-height: 1;
+        transform: translateY(-.5px);
+      }
+
+      .provider-mark {
+        border: 1px solid var(--pine);
+        background: var(--pine);
+      }
+
+      .provider-mark img {
+        width: 19px;
+        height: 19px;
+        display: block;
+        object-fit: contain;
+      }
+
+      .picker-row {
+        min-height: 58px;
+        padding: 11px 12px;
+      }
+
+      .configured {
+        min-width: 52px;
+        padding: 4px 7px;
+        border: 1px solid #bdd2b6;
+        border-radius: 999px;
+        text-align: center;
+      }
+
+      .install-shell {
+        padding: clamp(30px, 4vw, 48px);
+      }
+
+      .install-copy {
+        min-width: 0;
+        padding-block: 4px;
+      }
+
+      .install-copy .eyebrow {
+        margin-top: 0;
+      }
+
+      @media (max-width: 760px) {
+        .faq-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          padding-top: 58px;
+        }
+
+        .hero h1 {
+          font-size: clamp(3.1rem, 16vw, 5rem);
+        }
+
+        .companion-demo-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .demo-chat {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .research-rail {
+          display: none;
+        }
+
+        .question-row,
+        .assistant-answer,
+        .demo-chat .approval-card {
+          max-width: 100%;
+        }
+
+        .install-shell {
+          padding: 24px 18px;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         html {
           scroll-behavior: auto;
@@ -1107,8 +1971,8 @@
 
     <div class="release-note" role="status">
       <div class="container">
-        <span class="release-pill">v3.1.2 stable</span>
-        <span>The current stable release includes the unified green UI, live provider catalogs, durable chat, recovery queues, and safer chat-model filtering.</span>
+        <span class="release-pill">v3.2.0</span>
+        <span>A calmer workspace, visible Companion research, clearer tag cleanup, and one consistent Paper &amp; Pine interface.</span>
       </div>
     </div>
 
@@ -1135,52 +1999,105 @@
                 <span>Tagvico</span>
               </div>
               <div class="window-nav" aria-hidden="true">
-                <span><i class="nav-dot"></i>Actions</span>
-                <span class="active"><i class="nav-dot"></i>Ask Tagvico</span>
-                <span><i class="nav-dot"></i>Automation</span>
-                <span><i class="nav-dot"></i>Activity</span>
-                <span><i class="nav-dot"></i>Settings</span>
+                <span>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>
+                  Home
+                </span>
+                <span>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h5"></path></svg>
+                  Documents
+                </span>
+                <span class="active">
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.1L5 10l5.1 1.9L12 17l1.9-5.1L19 10l-5.1-1.9Z"></path><path d="M5 3v4"></path><path d="M3 5h4"></path><path d="M19 17v4"></path><path d="M17 19h4"></path></svg>
+                  Ask Tagvico
+                </span>
+                <span>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42Z"></path><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" stroke="none"></circle></svg>
+                  Organize tags
+                </span>
+                <span>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"></path><path d="m7 16 4-5 4 3 5-7"></path></svg>
+                  Activity
+                </span>
+                <span>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                  Settings
+                </span>
               </div>
               <div class="window-user">Private household workspace</div>
             </aside>
-            <div class="window-content">
+            <div class="window-content companion-demo">
               <div class="window-heading">
                 <div>
                   <div class="window-kicker">Your Paperless copilot</div>
                   <h2>Ask Tagvico</h2>
                   <p>Research your archive with visible sources and tool activity.</p>
                 </div>
-                <div class="model-chip"><i></i> ChatGPT subscription · live model⌄</div>
-              </div>
-              <div class="conversation">
-                <div class="bubble user">Which insurance renewals need my attention this month?</div>
-                <div class="tool-trace">
-                  <div class="tool-trace-head">
-                    <span>Paperless research</span>
-                    <span class="tool-status">3 steps complete</span>
-                  </div>
-                  <ol>
-                    <li>Search documents tagged “Insurance”</li>
-                    <li>Read dates and renewal terms from 6 matches</li>
-                    <li>Compare deadlines with the next 30 days</li>
-                  </ol>
-                </div>
-                <div class="bubble">
-                  Two policies need attention. The household policy renews on 18 August; the vehicle policy
-                  requires cancellation before 27 August. I found both dates in the linked source documents.
-                </div>
-                <div class="approval-card">
-                  <strong>Create an action from the vehicle policy?</strong>
-                  <p>Tagvico will not write to Paperless until you approve this operation.</p>
-                  <div class="mini-actions">
-                    <span class="mini-button approve">Review action</span>
-                    <span class="mini-button">Not now</span>
-                  </div>
+                <div class="model-chip">
+                  <span class="model-icon"><img src="provider-icons/openai.svg" alt=""></span>
+                  <span><strong>GPT-5.3 Codex Spark</strong><small>ChatGPT subscription · live catalog</small></span>
                 </div>
               </div>
-              <div class="composer">
-                <span class="composer-placeholder">Ask about documents, dates, people, or next steps…</span>
-                <span class="mini-button approve">Send</span>
+              <div class="companion-demo-grid">
+                <div class="demo-chat">
+                  <div class="chat-thread">
+                    <div class="question-row">Which insurance renewals need my attention this month?</div>
+                    <div class="assistant-answer">
+                      <div class="assistant-meta">
+                        <span class="assistant-avatar">Ai</span>
+                        <span><strong>Tagvico</strong><small>Answer grounded in your Paperless archive</small></span>
+                      </div>
+                      <p>
+                        Two policies need attention. Your household policy renews on <strong>18 August</strong>.
+                        The vehicle policy can still be cancelled until <strong>27 August</strong>.
+                      </p>
+                      <div class="source-pills" aria-label="Source documents">
+                        <span class="source-pill"><b>1</b> Household policy 2026</span>
+                        <span class="source-pill"><b>2</b> Vehicle renewal notice</span>
+                      </div>
+                    </div>
+                    <div class="approval-card">
+                      <strong>Create a follow-up for the vehicle policy?</strong>
+                      <p>The suggestion is ready, but nothing is written until you approve it.</p>
+                      <div class="mini-actions">
+                        <span class="mini-button approve">Review action</span>
+                        <span class="mini-button">Not now</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="composer">
+                    <div class="composer-copy">
+                      <span class="composer-placeholder">Ask a follow-up about these documents…</span>
+                      <div class="composer-meta">GPT-5.3 Codex Spark · read-only research</div>
+                    </div>
+                    <span class="send-button" aria-hidden="true">↑</span>
+                  </div>
+                </div>
+                <aside class="research-rail" aria-label="Visible research trail">
+                  <div class="research-rail-head">
+                    <div><strong>Research trail</strong><span>Visible by default</span></div>
+                    <span class="research-count">3 complete</span>
+                  </div>
+                  <div class="research-steps">
+                    <div class="research-step">
+                      <span class="step-icon">✓</span>
+                      <div><strong>Search Paperless</strong><small>Insurance renewals · 6 results</small></div>
+                    </div>
+                    <div class="research-step">
+                      <span class="step-icon">✓</span>
+                      <div><strong>Read relevant dates</strong><small>2 documents matched the question</small></div>
+                    </div>
+                    <div class="research-step">
+                      <span class="step-icon">✓</span>
+                      <div><strong>Compare deadlines</strong><small>Checked the next 30 days</small></div>
+                    </div>
+                  </div>
+                  <div class="source-stack">
+                    <div class="source-stack-label">Used for this answer</div>
+                    <div class="source-card"><strong>Household policy 2026</strong><small>Renewal · 18 August</small></div>
+                    <div class="source-card"><strong>Vehicle renewal notice</strong><small>Cancellation · 27 August</small></div>
+                  </div>
+                </aside>
               </div>
             </div>
           </div>
@@ -1193,7 +2110,7 @@
             <p class="eyebrow">Clear from the first login</p>
             <h2>Four jobs. One coherent workspace.</h2>
             <p>
-              The v3.1.2 navigation is organized around what you want to accomplish—not internal system names.
+              The v3.2 navigation is organized around what you want to accomplish, not internal system names.
             </p>
           </div>
           <div class="workflow-grid">
@@ -1252,22 +2169,22 @@
             </div>
             <div class="picker">
               <div class="picker-row selected">
-                <span class="provider-mark">CX</span>
+                <span class="provider-mark"><img src="provider-icons/openai.svg" alt=""></span>
                 <span><strong>ChatGPT subscription</strong><small>Live account catalog · selected model</small></span>
                 <span class="configured">Selected</span>
               </div>
               <div class="picker-row">
-                <span class="provider-mark">CX</span>
+                <span class="provider-mark"><img src="provider-icons/github-copilot.svg" alt=""></span>
                 <span><strong>GitHub Copilot</strong><small>Live plan catalog · account authentication</small></span>
                 <span class="configured">Live</span>
               </div>
               <div class="picker-row">
-                <span class="provider-mark">OR</span>
+                <span class="provider-mark"><img src="provider-icons/openrouter.svg" alt=""></span>
                 <span><strong>OpenRouter</strong><small>Configured cloud models</small></span>
                 <span class="configured">Live</span>
               </div>
               <div class="picker-row">
-                <span class="provider-mark">OL</span>
+                <span class="provider-mark"><img src="provider-icons/ollama.svg" alt=""></span>
                 <span><strong>Ollama</strong><small>Local model catalog</small></span>
                 <span class="configured">Live</span>
               </div>
@@ -1375,6 +2292,38 @@
         </div>
       </section>
 
+      <section id="faq">
+        <div class="container faq-grid">
+          <div class="faq-intro">
+            <p class="eyebrow">Good to know</p>
+            <h2>Before you connect your archive.</h2>
+            <p>Tagvico is designed to sit beside an existing Paperless-ngx installation. You keep control of the runtime, model and write policy.</p>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>Does Tagvico need a trigger tag?</summary>
+              <p>No. New documents can be processed automatically without a trigger tag. Trigger tags are optional when you want to limit processing to a manually selected subset.</p>
+            </details>
+            <details>
+              <summary>Can it use local models?</summary>
+              <p>Yes. Configure Ollama in Settings and Tagvico loads its live model catalog. Cloud APIs, ChatGPT subscription and GitHub Copilot can be configured separately.</p>
+            </details>
+            <details>
+              <summary>Will it change Paperless without asking?</summary>
+              <p>You choose the write policy. Review mode stages suggestions first. Automatic mode applies the enabled metadata fields directly, while tag unification always keeps analysis, document moves and source deletion separate.</p>
+            </details>
+            <details>
+              <summary>Where do credentials live?</summary>
+              <p>Secrets stay in the Tagvico installation and are never returned to the browser after saving. Settings only report whether a secret is configured.</p>
+            </details>
+            <details>
+              <summary>Can I undo a bad result?</summary>
+              <p>Yes. Activity keeps the original snapshot for processed documents, supports rescanning with current settings and can restore the first saved state.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
       <section id="documentation">
         <div class="container">
           <div class="docs-callout">
@@ -1399,7 +2348,7 @@
             <h2>Start beside Paperless.</h2>
             <p>
               Pin the stable image, keep the data volume, and complete the guided setup in your browser.
-              The current stable image is v3.1.2. Pin the immutable tag so upgrades stay deliberate and rollback remains simple.
+              The current 3.2 image uses the same persistent data volume. Pin the immutable tag so upgrades stay deliberate and rollback remains simple.
             </p>
             <div class="actions" style="justify-content:flex-start">
               <a class="button primary" href="/docs/installation">Installation guide</a>
@@ -1414,7 +2363,7 @@
               </div>
               <pre><code>services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.1.2
+    image: ghcr.io/arturict/tagvico-ai:3.2.0
     restart: unless-stopped
     ports:
       - "8080:3000"
@@ -1447,7 +2396,7 @@ volumes:
     <script>
       const composeSnippet = `services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.1.2
+    image: ghcr.io/arturict/tagvico-ai:3.2.0
     restart: unless-stopped
     ports:
       - "8080:3000"

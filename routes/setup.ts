@@ -1148,6 +1148,18 @@ router.get('/review', isAuthenticated, (_req: Req, res: Res) => {
   res.status(410).json({ error: 'Legacy review UI retired. Use the Next.js /review page.' });
 });
 
+router.get('/api/review-queue', isAuthenticated, async (_req: Req, res: Res) => {
+  try {
+    res.json({
+      suggestions: await reviewService.listPendingSuggestions(100),
+      reviewMode: reviewService.isReviewModeEnabled()
+    });
+  } catch (error) {
+    console.error('[ERROR] listing review suggestions:', error);
+    res.status(500).json({ error: 'The review queue is unavailable.' });
+  }
+});
+
 function parseSuggestionId(value: RequestValue) {
   const raw = String(value || '');
   if (!/^\d+$/.test(raw)) return null;
@@ -3081,7 +3093,7 @@ router.get('/api/dashboard', async (_req: Req, res: Res) => {
     res.json({
       summary,
       processing,
-      version: configFile.TAGVICO_AI_VERSION || '3.1.2'
+      version: configFile.TAGVICO_AI_VERSION || '3.2.0'
     });
   } catch (error) {
     console.error('[ERROR] loading dashboard data:', error);
@@ -4609,7 +4621,7 @@ router.get('/api/operations/status', async (_req: Req, res: Res) => {
   res.json({
     ocrEnabled: ocrService.isEnabled(),
     ocrProvider: config.ocr?.provider || 'mistral',
-    version: configFile.TAGVICO_AI_VERSION || '3.1.2'
+    version: configFile.TAGVICO_AI_VERSION || '3.2.0'
   });
 });
 

@@ -9,6 +9,7 @@ process.env.TAGVICO_DATA_DIR = dataDir;
 process.env.SCAN_INTERVAL = '5 * * * *';
 process.env.AI_PROVIDER = 'ollama';
 process.env.OLLAMA_MODEL = 'qwen3.5:4b';
+process.env.OPENROUTER_API_KEY = '';
 fs.writeFileSync(path.join(dataDir, '.env'), [
   'TAGVICO_AI_INITIAL_SETUP=yes',
   'TAGVICO_AI_VERSION=3.0.0',
@@ -19,6 +20,7 @@ fs.writeFileSync(path.join(dataDir, '.env'), [
   'COMPATIBLE_BASE_URL=http://proxy.internal:8317/v1',
   'COMPATIBLE_API_KEY=proxy-secret-value',
   'COMPATIBLE_MODEL=gpt-5.6-terra',
+  'OPENROUTER_API_KEY=openrouter-persisted-secret',
   'AI_MODEL=gpt-5.6-terra',
   'API_KEY=external-secret-value',
   "EXTERNAL_API_HEADERS='{\"Authorization\":\"Bearer header-secret-value\"}'",
@@ -33,6 +35,7 @@ fs.writeFileSync(path.join(dataDir, '.env'), [
 
 const service = require('../dist/services/settingsV3Service');
 const setupService = require('../dist/services/setupService');
+const runtimeEnvironment = require('../dist/services/runtimeEnvironment');
 
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
@@ -56,6 +59,18 @@ test('GET settings follows injected-environment precedence and preserves flex mo
   assert.equal(settings.automation.scanInterval, '5 * * * *');
   assert.equal(settings.automation.processingMode, 'flex');
   assert.equal(settings.automation.customPrompt, 'Prefer broad archive categories.');
+});
+
+test('empty injected placeholders do not mask credentials saved in Settings', async () => {
+  assert.equal(
+    runtimeEnvironment.runtimeEnvironmentValue('OPENROUTER_API_KEY'),
+    'openrouter-persisted-secret'
+  );
+  const settings = await service.getSettings();
+  assert.equal(
+    settings.ai.providers.find((provider) => provider.instanceId === 'openrouter').configuration.apiKey.configured,
+    true
+  );
 });
 
 test('PATCH uses a revision and empty secret fields retain existing values', async () => {

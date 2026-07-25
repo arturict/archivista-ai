@@ -15,7 +15,10 @@ export function resolveRuntimeModel(selection?: CompanionModelSelection | null):
       kind: 'text-adapter',
       provider: 'codex',
       modelId: selected.model,
-      generateText: (prompt, signal) => codexService.generateText(prompt, signal, { model: selected.model })
+      generateText: (prompt, signal) => codexService.generateText(prompt, signal, {
+        model: selected.model,
+        reasoningEffort: selection?.reasoningEffort
+      })
     };
   }
   if (selected.provider === 'copilot') {

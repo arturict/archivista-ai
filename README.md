@@ -17,7 +17,7 @@ record. Reviewable AI metadata automation remains included.
 [![Latest release](https://img.shields.io/github/v/release/arturict/tagvico-ai)](https://github.com/arturict/tagvico-ai/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/arturict/tagvico-ai/ci.yml?branch=main&label=CI)](https://github.com/arturict/tagvico-ai/actions/workflows/ci.yml)
 
-![Tagvico v3.1.2 Action Center](docs/screenshots/action-center-green-v3.png)
+![Tagvico v3.2 Home workspace](website/versions/v3/public/screenshots/home-paper-pine-v3.png)
 
 ## Why Tagvico
 
@@ -48,21 +48,21 @@ which account-scoped model is active, and which vocabulary the model may use.
 <table>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/ai-models-green-v3.png" alt="Tagvico v3.1.2 AI model settings showing the supported provider registry">
+      <img src="website/versions/v3/public/screenshots/ai-models-paper-pine-v3.png" alt="Tagvico v3.2 AI model settings showing the supported provider registry">
       <br><strong>Use the provider boundary that fits your archive.</strong><br>
       Live model discovery, write-only credentials, local inference, API providers, ChatGPT subscription, and GitHub Copilot.
     </td>
     <td width="50%">
-      <img src="docs/screenshots/companion-green-v3.png" alt="Tagvico v3.1.2 persistent Ask Tagvico workspace">
+      <img src="website/versions/v3/public/screenshots/companion-paper-pine-v3.png" alt="Tagvico v3.2 persistent Ask Tagvico workspace">
       <br><strong>Research with a visible approval boundary.</strong><br>
       Persistent chats, a configured model picker, privacy-safe tool activity, and explicit approval before writes.
     </td>
   </tr>
 </table>
 
-<p align="center"><em>Sanitized v3.1.2 screens from a representative installation. No document contents, credentials, endpoints, or account identifiers are shown.</em></p>
+<p align="center"><em>Sanitized v3.2 screens from a representative installation. No document contents, credentials, endpoints, or account identifiers are shown.</em></p>
 
-## Stable quick start (v3.1.2)
+## Stable quick start (v3.2.0)
 
 Use only immutable tags that are present on the
 [GitHub releases page](https://github.com/arturict/tagvico-ai/releases).
@@ -76,7 +76,7 @@ services:
   tagvico-ai:
     # Pin an immutable release tag for upgrades you can rely on.
     # See https://github.com/arturict/tagvico-ai/releases for the current version.
-    image: ghcr.io/arturict/tagvico-ai:3.1.2
+    image: ghcr.io/arturict/tagvico-ai:3.2.0
     container_name: tagvico-ai
     restart: unless-stopped
     cap_drop:
@@ -129,7 +129,7 @@ docker run -d \
   -e TAGVICO_AI_PORT=3000 \
   -e ALLOW_REMOTE_SETUP=yes \
   -v tagvico_ai_data:/app/data \
-  ghcr.io/arturict/tagvico-ai:3.1.2
+  ghcr.io/arturict/tagvico-ai:3.2.0
 ```
 
 After setup succeeds, remove and recreate the container without
@@ -219,7 +219,7 @@ Activity supports single and bulk rescan, exact restoration of the first metadat
 ## Upgrades
 
 1. Check the latest release at <https://github.com/arturict/tagvico-ai/releases>.
-2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page—for example `ghcr.io/arturict/tagvico-ai:3.1.2`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
+2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page—for example `ghcr.io/arturict/tagvico-ai:3.2.0`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
 3. `docker compose pull && docker compose up -d`.
 
 The container is replaceable, while configuration, processing history, the local admin account, encrypted member tokens, and the installation secret live in the `tagvico_ai_data` volume. Back up and restore that volume as one unit; changing or losing the JWT secret makes encrypted member tokens unreadable.

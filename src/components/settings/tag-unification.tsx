@@ -57,7 +57,7 @@ export function TagUnification({
     setReasoningEffort('');
     if (!nextProviderId) return;
     setBusy('models');
-    setStatus({ kind: 'loading', message: 'Loading the provider live catalog…' });
+    setStatus(null);
     try {
       const response = await fetch(`/api/providers/${encodeURIComponent(nextProviderId)}/models`, { cache: 'no-store' });
       const body = await response.json().catch(() => ({}));
@@ -263,6 +263,9 @@ export function TagUnification({
         </select>
       </label> : null}
     </div>
+    {busy === 'models' ? <div className="model-catalog-skeleton tag-model-skeleton" aria-label="Loading provider models">
+      {Array.from({ length: 3 }, (_, index) => <span key={index}><i /><b /><small /></span>)}
+    </div> : null}
     <div className="settings-action-cluster tag-unification-actions">
       <button
         className="settings-button is-primary"

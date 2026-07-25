@@ -53,6 +53,47 @@ test('Companion rejects stale or invented models and falls back to a runtime def
   });
 });
 
+test('Companion validates per-model reasoning and removes invalid document tool markers', () => {
+  const catalog = {
+    providers: [{
+      instanceId: 'codex',
+      name: 'ChatGPT subscription',
+      models: [{
+        id: 'gpt-5.6-terra',
+        name: 'Terra',
+        isDefault: true,
+        capabilities: ['tools', 'thinking'],
+        options: [{
+          id: 'reasoningEffort',
+          label: 'Thinking effort',
+          type: 'select',
+          defaultValue: 'medium',
+          values: [{ id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }]
+        }]
+      }]
+    }],
+    defaultSelection: { providerInstanceId: 'codex', modelId: 'gpt-5.6-terra' }
+  };
+  assert.equal(modelService.selectionIsAvailable(catalog, {
+    providerInstanceId: 'codex',
+    modelId: 'gpt-5.6-terra',
+    reasoningEffort: 'medium'
+  }), true);
+  assert.equal(modelService.selectionIsAvailable(catalog, {
+    providerInstanceId: 'codex',
+    modelId: 'gpt-5.6-terra',
+    reasoningEffort: 'invented'
+  }), false);
+  assert.equal(
+    companion.sanitizeCompanionText('24 documents. [doc:count_documents]'),
+    '24 documents.'
+  );
+  assert.equal(
+    companion.sanitizeCompanionText('Read [doc:42] before renewing.'),
+    'Read [doc:42] before renewing.'
+  );
+});
+
 test('Companion excludes live catalog entries that cannot answer chat requests', () => {
   for (const id of [
     'text-embedding-3-small',
@@ -67,11 +108,23 @@ test('Companion excludes live catalog entries that cannot answer chat requests',
     'gpt-realtime-2',
     'sora-2'
   ]) {
-    assert.equal(modelService.supportsCompanionModel({ id }), false, id);
+    assert.equal(modelService.supportsCompanionModel({ id, capabilities: [] }), false, id);
   }
   for (const id of ['gpt-5.6-terra', 'claude-sonnet-4.6', 'gemma3:latest', 'gpt-4o-search-preview']) {
-    assert.equal(modelService.supportsCompanionModel({ id }), true, id);
+    assert.equal(modelService.supportsCompanionModel({ id, capabilities: [] }), true, id);
   }
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'gemma4:e2b',
+    capabilities: ['completion', 'tools', 'vision']
+  }, 'ollama'), true);
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'gemma3:4b',
+    capabilities: ['completion', 'vision']
+  }, 'ollama'), false);
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'unknown-local-model',
+    capabilities: []
+  }, 'ollama'), false);
 });
 
 test('retired and unsupported provider definitions are never exposed as verified Companion runtimes', () => {
@@ -146,6 +199,33 @@ test('subscription adapters only research clear Paperless intents', () => {
     steps: [{ toolName: 'count_documents', input: {} }],
     readSearchResults: false
   });
+  assert.deepEqual(research.planCompanionResearch('doc://countdocuments'), {
+    steps: [{ toolName: 'count_documents', input: {} }],
+    readSearchResults: false
+  });
+  assert.deepEqual(
+    research.planCompanionResearch('Create a Paperless tag named Codex QA Temporary'),
+    {
+      steps: [{
+        toolName: 'propose_tag_create',
+        input: {
+          name: 'Codex QA Temporary',
+          reason: 'Create the Paperless tag "Codex QA Temporary" as requested.'
+        }
+      }],
+      readSearchResults: false
+    }
+  );
+  assert.equal(
+    research.directCompanionResearchAnswer('doc://countdocuments', [
+      { toolName: 'count_documents', output: { count: 24 } }
+    ]),
+    'Your Paperless library contains 24 documents in total.'
+  );
+  assert.equal(
+    research.directCompanionResearchAnswer('doc://countdocuments', []),
+    null
+  );
   assert.deepEqual(research.planCompanionResearch('Show my newest documents'), {
     steps: [{ toolName: 'list_recent_documents', input: { limit: 8 } }],
     readSearchResults: false

@@ -4,15 +4,16 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Ban, BookOpen, Gauge, History, ListChecks, LogOut, Megaphone, Settings, Sparkles, Stamp, TriangleAlert } from 'lucide-react';
+import { Activity, Ban, BookOpen, FileText, Home, LogOut, Megaphone, PanelLeftClose, PanelLeftOpen, Settings, Sparkles, Stamp, Tags, TriangleAlert } from 'lucide-react';
 import { fetchJson } from '@/lib/client/fetch-json';
 
 const links = [
-  { href: '/actions', label: 'Actions', description: 'Tasks and deadlines from documents', Icon: ListChecks },
+  { href: '/automation', label: 'Home', description: 'Overview and document processing', Icon: Home },
+  { href: '/documents', label: 'Documents', description: 'Processed documents and their history', Icon: FileText },
+  { href: '/review', label: 'Review queue', description: 'Approve document filing suggestions', Icon: Stamp },
   { href: '/companion', label: 'Ask Tagvico', description: 'Research your Paperless archive', Icon: Sparkles },
-  { href: '/automation', label: 'Automation', description: 'Scan and organize documents', Icon: Gauge },
-  { href: '/review', label: 'Review queue', description: 'Approve suggested changes', Icon: Stamp },
-  { href: '/activity', label: 'Activity', description: 'See, restore or re-run changes', Icon: History },
+  { href: '/tags', label: 'Organize tags', description: 'Review and merge duplicate tags', Icon: Tags },
+  { href: '/activity', label: 'Activity', description: 'See, restore or re-run changes', Icon: Activity },
   { href: '/settings', label: 'Settings', description: 'Connections, models and access', Icon: Settings }
 ] as const;
 
@@ -69,9 +70,9 @@ export function AppNavigationShell({ children, workspaceName, userLabel, initial
 
   return <div className={`shell${collapsed ? ' is-collapsed' : ''}`}>
     <aside className="sidebar">
-      <Link href="/actions" className="brand"><Image className="brand-mark" src="/tagvico-icon.png" alt="" width={31} height={31} /><span className="nav-copy">Tagvico</span></Link>
+      <Link href="/automation" className="brand"><Image className="brand-mark" src="/tagvico-icon.png" alt="" width={31} height={31} /><span className="nav-copy">Tagvico</span><small className="nav-copy">workspace</small></Link>
       <button className="sidebar-collapse" type="button" onClick={toggle} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
-        {collapsed ? '›' : '‹'}
+        {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
       </button>
       <nav className="nav" aria-label="Main navigation">
         {links.filter(({ href }) => href !== '/review' || writeMode === 'review').map(({ href, label, description, Icon }) => <div className="nav-entry" key={href}>
@@ -82,7 +83,7 @@ export function AppNavigationShell({ children, workspaceName, userLabel, initial
               ? <span className="nav-badge nav-badge-total" aria-label={`${recoveryCounts.failed + recoveryCounts.ignored} recovery items`}>{recoveryCounts.failed + recoveryCounts.ignored}</span>
               : null}
           </Link>
-          {href === '/automation' ? <div className="nav-sub-links nav-copy">
+          {href === '/automation' && recoveryCounts.failed + recoveryCounts.ignored > 0 ? <div className="nav-sub-links nav-copy">
             <Link href="/automation/recovery#failed-documents" title="Permanently failed documents">
               <TriangleAlert aria-hidden="true" /><span>Failed</span><span className="nav-badge">{recoveryCounts.failed}</span>
             </Link>
@@ -98,7 +99,7 @@ export function AppNavigationShell({ children, workspaceName, userLabel, initial
           <Link href="/changelog" title="What's new"><Megaphone className="nav-icon" aria-hidden="true" /><span className="nav-copy">What&apos;s new</span></Link>
           <a href="/logout" title="Sign out"><LogOut className="nav-icon" aria-hidden="true" /><span className="nav-copy">Sign out</span></a>
         </div>
-        <div className="sidebar-identity nav-copy"><div>{workspaceName}</div><div>{userLabel}</div></div>
+        <div className="sidebar-identity nav-copy"><span>{workspaceName.slice(0, 1).toUpperCase()}</span><div><strong>{workspaceName}</strong><small>{userLabel}</small></div></div>
       </div>
     </aside>
     <main className="main">{children}</main>

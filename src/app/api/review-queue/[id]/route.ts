@@ -7,13 +7,7 @@ import {
   requireApiUser
 } from '@/lib/server/auth';
 import { workspaceFor } from '@/lib/server/workspace';
-
-// The durable queue remains a CommonJS backend service shared with Express.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const reviewService = require('../../../../../services/reviewService') as {
-  applySuggestion(id: number, actor?: string | null): Promise<{ ok: boolean; reason?: string; status?: number }>;
-  rejectSuggestion(id: number, actor?: string | null, note?: string | null): Promise<{ ok: boolean; reason?: string; status?: number }>;
-};
+import { backendBearerHeaders } from '../../../../../services/backendProxyAuth';
 
 type DecisionBody = { action?: 'apply' | 'reject'; note?: string };
 
@@ -28,13 +22,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return Response.json({ error: 'A valid suggestion id is required.' }, { status: 400 });
     }
     const body = await readJsonBody<DecisionBody>(request);
-    const actor = `web:${user.username}`;
-    const result = body.action === 'apply'
-      ? await reviewService.applySuggestion(id, actor)
-      : body.action === 'reject'
-        ? await reviewService.rejectSuggestion(id, actor, String(body.note || '').trim() || null)
-        : { ok: false, reason: 'Action must be apply or reject.', status: 400 };
-    return Response.json(result, { status: result.ok ? 200 : (result.status || 409) });
+    if (body.action !== 'apply' && body.action !== 'reject') {
+      return Response.json({ error: 'Action must be apply or reject.' }, { status: 400 });
+    }
+    const backend = process.env.TAGVICO_BACKEND_URL || 'http://127.0.0.1:3001';
+    const response = await fetch(`${backend}/review/${id}/${body.action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...backendBearerHeaders(request)
+      },
+      body: JSON.stringify(body.action === 'reject' ? { note: String(body.note || '').trim() || null } : {}),
+      cache: 'no-store',
+      redirect: 'manual'
+    });
+    return new Response(await response.text(), {
+      status: response.status,
+      headers: {
+        'Content-Type': response.headers.get('content-type') || 'application/json',
+        'Cache-Control': 'no-store'
+      }
+    });
   } catch (error) {
     return apiError(error instanceof ApiError ? error : new ApiError(500, 'The review decision failed.'));
   }

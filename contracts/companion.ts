@@ -7,7 +7,8 @@ export const companionModelSelectionSchema = z.object({
     .min(1)
     .max(80)
     .regex(/^[a-z0-9][a-z0-9._-]*$/i),
-  modelId: z.string().trim().min(1).max(200)
+  modelId: z.string().trim().min(1).max(200),
+  reasoningEffort: z.string().trim().min(1).max(40).optional()
 }).strict();
 
 export type CompanionModelSelection = z.infer<typeof companionModelSelectionSchema>;
@@ -47,6 +48,11 @@ export interface CompanionToolActivity {
       created?: string;
       modified?: string;
     }>;
+    tags?: Array<{
+      id: number;
+      name: string;
+      documentCount?: number;
+    }>;
   };
 }
 
@@ -56,9 +62,25 @@ const TOOL_LABELS: Record<string, string> = {
   list_recent_documents: 'Loading recent documents',
   search_documents: 'Searching Paperless',
   get_document: 'Reading a Paperless document',
+  list_tags: 'Reading Paperless tags',
+  get_tag: 'Reading a Paperless tag',
+  propose_document_update: 'Preparing a document change',
+  propose_tag_create: 'Preparing a new tag',
+  propose_tag_update: 'Preparing a tag change',
+  propose_tag_delete: 'Preparing tag deletion',
   propose_action: 'Preparing an action proposal',
   propose_action_update: 'Preparing an action update'
 };
+
+export function sanitizeCompanionText(value: unknown) {
+  return String(value || '')
+    .replace(/\[doc:[^\r\n]*?(?:\]|$)/gi, (marker) => (
+      /^\[doc:\d+\]$/i.test(marker) ? marker : ''
+    ))
+    .replace(/\s+([,.;!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
 
 function countResult(output: unknown): number | null {
   if (Array.isArray(output)) return output.length;
@@ -86,6 +108,15 @@ export function safeCompanionToolInput(toolName: string, input: unknown): Record
     return { limit };
   }
   if (toolName === 'count_documents') return {};
+  if (toolName === 'list_tags') {
+    const query = String(candidate.query || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const limit = Math.max(1, Math.min(200, Math.trunc(Number(candidate.limit) || 100)));
+    return { ...(query ? { query } : {}), limit };
+  }
+  if (toolName === 'get_tag') {
+    const tagId = Number(candidate.tagId);
+    return Number.isSafeInteger(tagId) && tagId > 0 ? { tagId } : {};
+  }
   if (toolName === 'list_actions') {
     const status = String(candidate.status || '');
     return ['suggested', 'open', 'waiting', 'done', 'dismissed'].includes(status)
@@ -131,6 +162,29 @@ function safeDocuments(output: unknown) {
   }).slice(0, 20);
 }
 
+function safeTags(output: unknown) {
+  const candidate = Array.isArray(output)
+    ? output
+    : output && typeof output === 'object' && Array.isArray((output as Record<string, unknown>).tags)
+      ? (output as Record<string, unknown>).tags as unknown[]
+      : output && typeof output === 'object'
+        ? [output]
+        : [];
+  return candidate.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const tag = item as Record<string, unknown>;
+    const id = Number(tag.id ?? tag.tagId);
+    const name = String(tag.name || '').replace(/\s+/g, ' ').trim().slice(0, 128);
+    if (!Number.isSafeInteger(id) || id <= 0 || !name) return [];
+    const documentCount = Number(tag.documentCount ?? tag.document_count);
+    return [{
+      id,
+      name,
+      ...(Number.isSafeInteger(documentCount) && documentCount >= 0 ? { documentCount } : {})
+    }];
+  }).slice(0, 200);
+}
+
 /**
  * Convert an AI SDK tool part into presentation-only copy. User-authored
  * search terms and document metadata stay visible; OCR, provider errors,
@@ -173,8 +227,12 @@ export function companionToolActivity(
           ? 'Reading only the document needed for this answer…'
           : toolName === 'count_documents'
             ? 'Checking the Paperless library total…'
-            : toolName === 'list_recent_documents'
+          : toolName === 'list_recent_documents'
               ? 'Loading recent document metadata…'
+              : toolName === 'list_tags'
+                ? 'Loading the Paperless tag vocabulary…'
+                : toolName === 'get_tag'
+                  ? 'Reading the selected tag and its usage…'
               : 'Working with the minimum information needed…',
       status: 'running',
       input: safeCompanionToolInput(toolName, input)
@@ -195,11 +253,20 @@ export function companionToolActivity(
     get_document: Number.isSafeInteger(documentId) && documentId > 0
       ? `Document #${documentId} was read. Its private contents remain hidden here.`
       : 'The requested document was read. Its private contents remain hidden here.',
+    list_tags: count === null ? 'Paperless tags loaded.' : `Loaded ${count} Paperless tag${count === 1 ? '' : 's'}.`,
+    get_tag: 'The selected Paperless tag was read.',
+    propose_document_update: 'A document change is waiting for approval. Nothing changed yet.',
+    propose_tag_create: 'A new tag is waiting for approval. Nothing changed yet.',
+    propose_tag_update: 'A tag change is waiting for approval. Nothing changed yet.',
+    propose_tag_delete: 'Tag deletion is waiting for approval. Nothing changed yet.',
     propose_action: 'An approval card was prepared. Nothing was changed yet.',
     propose_action_update: 'An approval card was prepared. Nothing was changed yet.'
   };
   const documents = ['search_documents', 'list_recent_documents', 'get_document'].includes(toolName)
     ? safeDocuments(output)
+    : [];
+  const tags = ['list_tags', 'get_tag'].includes(toolName)
+    ? safeTags(output)
     : [];
   return {
     toolName,
@@ -209,7 +276,8 @@ export function companionToolActivity(
     input: safeCompanionToolInput(toolName, input),
     result: {
       ...(count === null ? {} : { count }),
-      ...(documents.length ? { documents } : {})
+      ...(documents.length ? { documents } : {}),
+      ...(tags.length ? { tags } : {})
     }
   };
 }

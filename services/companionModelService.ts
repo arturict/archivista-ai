@@ -34,9 +34,16 @@ export function supportsCompanionRuntime(definition: Pick<ProviderDefinition, 'r
   return SUPPORTED_ADAPTERS.has(definition.runtimeAdapter);
 }
 
-export function supportsCompanionModel(model: Pick<ModelDescriptor, 'id'>) {
+export function supportsCompanionModel(
+  model: Pick<ModelDescriptor, 'id' | 'capabilities'>,
+  providerInstanceId = ''
+) {
   const id = String(model.id || '').trim();
-  return Boolean(id) && !NON_CHAT_MODEL_ID.test(id) && !LEGACY_COMPLETION_MODEL_ID.test(id);
+  if (!id || NON_CHAT_MODEL_ID.test(id) || LEGACY_COMPLETION_MODEL_ID.test(id)) return false;
+  if (providerInstanceId === 'ollama' || providerInstanceId === 'ollama-cloud') {
+    return Array.isArray(model.capabilities) && model.capabilities.includes('tools');
+  }
+  return true;
 }
 
 export function hasCompanionConfiguration(definition: ProviderDefinition, env: Environment) {
@@ -78,9 +85,16 @@ export function selectionIsAvailable(
   selection: CompanionModelSelection | null
 ): selection is CompanionModelSelection {
   if (!selection) return false;
-  return Boolean(catalog.providers
+  const model = catalog.providers
     .find((provider) => provider.instanceId === selection.providerInstanceId)
-    ?.models.some((model) => model.id === selection.modelId));
+    ?.models.find((candidate) => candidate.id === selection.modelId);
+  if (!model) return false;
+  if (!selection.reasoningEffort) return true;
+  const option = model.options.find(
+    (candidate): candidate is Extract<ModelDescriptor['options'][number], { type: 'select' }> =>
+      candidate.id === 'reasoningEffort' && candidate.type === 'select'
+  );
+  return Boolean(option?.values.some((value) => value.id === selection.reasoningEffort));
 }
 
 async function effectiveEnvironment(): Promise<Environment> {
@@ -108,7 +122,7 @@ async function discoverVerifiedProvider(
   if (!supportsCompanionRuntime(definition) || !hasCompanionConfiguration(definition, env)) return null;
   try {
     const models = (await providerDiscoveryService.discoverProviderModels(definition.id, env) as ModelDescriptor[])
-      .filter(supportsCompanionModel);
+      .filter((model) => supportsCompanionModel(model, definition.id));
     if (!models.length) return null;
     return {
       instanceId: definition.id,

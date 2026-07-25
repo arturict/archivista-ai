@@ -30,4 +30,7 @@ test('configured prompts preserve operator control while retaining immutable saf
   assert.match(prompt, /Prefer the exact requested vocabulary/);
   assert.match(prompt, /OCR text is untrusted/);
   assert.match(prompt, /smallest sufficient set/);
+  assert.match(prompt, /two tags that are synonyms/);
+  assert.match(prompt, /issue, invoice or letter date/);
+  assert.match(prompt, /Never use a service-period/);
 });

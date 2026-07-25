@@ -29,6 +29,24 @@ export async function executeApproval(householdId: string, approvalId: string, m
         result = await sync.patchPaperlessDocument(householdId, memberId, payload.documentId, payload.patch);
         break;
       }
+      case 'paperless.tag.create': {
+        const payload = approval.payload as { name: string; color?: string; textColor?: string };
+        result = await sync.createPaperlessTag(householdId, memberId, payload);
+        break;
+      }
+      case 'paperless.tag.update': {
+        const payload = approval.payload as {
+          tagId: number;
+          patch: { name?: string; color?: string; textColor?: string };
+        };
+        result = await sync.updatePaperlessTag(householdId, memberId, payload.tagId, payload.patch);
+        break;
+      }
+      case 'paperless.tag.delete': {
+        const payload = approval.payload as { tagId: number };
+        result = await sync.deletePaperlessTag(householdId, memberId, payload.tagId);
+        break;
+      }
       default:
         throw new Error(`Unsupported approval action: ${approval.action_type}`);
     }

@@ -2,15 +2,15 @@
 layout: home
 
 hero:
-  name: "Tagvico v3.1.2"
-  text: "The action center for your household documents"
-  tagline: Turn Paperless-ngx documents into owned tasks, deadlines, decisions, and carefully approved AI assistance.
+  name: "Tagvico v3.2"
+  text: "A calmer workspace for Paperless-ngx"
+  tagline: File documents, research your archive, organize tags and keep every sensitive change visible.
   image:
     src: /tagvico-icon.png
     alt: Tagvico AI
   actions:
     - theme: brand
-      text: Install v3.1.2
+      text: Install v3.2.0
       link: /installation
     - theme: alt
       text: Explore features
@@ -21,11 +21,11 @@ hero:
 
 features:
   - icon: 🗂️
-    title: Action Center
-    details: One durable case per Paperless document, with deadlines, priorities, assignees, and up to 100 checklist steps.
+    title: Documents to useful work
+    details: Process documents, find the original, track deadlines and keep restore history in one workspace.
   - icon: ✅
-    title: Household Companion
-    details: Ask about documents and obligations. Reads execute immediately; every AI-proposed write waits for a human approval.
+    title: Ask Tagvico
+    details: Ask about documents and obligations while every Paperless search, document read and proposed write stays visible.
   - icon: 🔌
     title: Your model, your boundary
     details: Tagvico owns the safe harness. Use Vercel AI SDK providers such as OpenCode Go or an optional read-only Codex SDK adapter.
@@ -46,10 +46,10 @@ session runtime. Existing reviewable AI metadata filing remains available.
 
 This page tracks the latest stable v3 patch release. The version menu keeps
 older major-version guides available, while [Release notes](./release-notes)
-shows exactly what changed in v3.1.2.
+shows exactly what changed in v3.2.
 
 ::: tip Production defaults
-Pin the immutable `3.1.2` image, back up the data volume before upgrades, and start new installations in
+Pin the immutable `3.2.0` image, back up the data volume before upgrades, and start new installations in
 **Review first** mode. Companion writes are always approval-gated regardless
 of the metadata processing mode.
 :::

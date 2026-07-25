@@ -23,7 +23,14 @@ export interface ActionCaseInput {
 const CASE_STATUSES = new Set<CaseStatus>(['suggested', 'open', 'waiting', 'done', 'dismissed']);
 const PRIORITIES = new Set<CasePriority>(['low', 'normal', 'high', 'urgent']);
 const SOURCES = new Set<CaseSource>(['manual', 'ai', 'paperless', 'telegram']);
-const APPROVAL_ACTIONS = new Set(['action.create', 'action.update', 'paperless.patch']);
+const APPROVAL_ACTIONS = new Set([
+  'action.create',
+  'action.update',
+  'paperless.patch',
+  'paperless.tag.create',
+  'paperless.tag.update',
+  'paperless.tag.delete'
+]);
 const id = () => crypto.randomUUID();
 const json = (value: unknown) => JSON.stringify(value ?? {});
 
@@ -307,7 +314,14 @@ export function getCompanionModelSelection(householdId: string, sessionId: strin
       if (content.type !== 'companion.model-selection') continue;
       const providerInstanceId = String(content.providerInstanceId || '').trim();
       const modelId = String(content.modelId || '').trim();
-      if (providerInstanceId && modelId) return { providerInstanceId, modelId };
+      const reasoningEffort = String(content.reasoningEffort || '').trim();
+      if (providerInstanceId && modelId) {
+        return {
+          providerInstanceId,
+          modelId,
+          ...(reasoningEffort ? { reasoningEffort } : {})
+        };
+      }
     } catch {
       // Ignore malformed historical metadata and continue to an older choice.
     }
@@ -319,7 +333,7 @@ export function setCompanionModelSelection(
   householdId: string,
   sessionId: string,
   memberId: string | null,
-  selection: { providerInstanceId: string; modelId: string }
+  selection: { providerInstanceId: string; modelId: string; reasoningEffort?: string }
 ) {
   const session = db.prepare('SELECT member_id FROM companion_sessions WHERE id=? AND household_id=?')
     .get(sessionId, householdId) as { member_id?: string | null } | undefined;
@@ -329,7 +343,10 @@ export function setCompanionModelSelection(
   const content = {
     type: 'companion.model-selection',
     providerInstanceId: assertText(selection.providerInstanceId, 'Provider instance', 80),
-    modelId: assertText(selection.modelId, 'Model', 200)
+    modelId: assertText(selection.modelId, 'Model', 200),
+    ...(selection.reasoningEffort
+      ? { reasoningEffort: assertText(selection.reasoningEffort, 'Thinking effort', 40) }
+      : {})
   };
   addMessage(sessionId, 'system', content);
   return content;

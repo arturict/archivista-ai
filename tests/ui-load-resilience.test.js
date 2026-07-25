@@ -63,10 +63,11 @@ test('workspace JSON requests report HTTP errors, time out and clear timers', as
 test('dashboard replaces a failed initial skeleton with a retryable error', () => {
   const dashboard = source('src/components/automation-dashboard.tsx');
   const errorBranch = dashboard.indexOf('!summary && loadError');
-  const skeletonBranch = dashboard.indexOf('!summary ? <section className="workspace-skeleton"');
+  const skeletonBranch = dashboard.indexOf('!summary ? <WorkspacePageSkeleton kind="dashboard"');
 
   assert.ok(errorBranch >= 0);
   assert.ok(skeletonBranch > errorBranch);
+  assert.match(dashboard, /import \{ WorkspacePageSkeleton \}/);
   assert.match(dashboard, /title="Document metrics are unavailable"/);
   assert.match(dashboard, /onRetry=\{\(\) => void load\(\)\}/);
 });

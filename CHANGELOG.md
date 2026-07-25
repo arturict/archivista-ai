@@ -1,5 +1,82 @@
 # Changelog
 
+## 3.2.0 - 2026-07-26
+
+### Paper & Pine interface
+
+- Replace the previous dark console styling with one light, coherent Tagvico
+  design across the application and public landing page: warm paper surfaces,
+  pine navigation, restrained lime accents, calmer borders, editorial
+  typography and responsive layouts.
+- Remove the planned beta-theme toggle. The new interface is the product
+  interface, so there is no second visual system to maintain or accidentally
+  expose.
+- Rework the persistent, collapsible sidebar around recognizable user jobs:
+  Home, Documents, Ask Tagvico, Organize tags, Activity and Settings.
+- Raise contrast across document tags, provider navigation, capability badges,
+  model rows, inputs and secondary text while keeping lime as the active
+  control accent.
+- Replace generic loading copy with structure-preserving skeletons on Home,
+  Documents, Activity, provider catalogs and tag-organization model discovery.
+- Make Home the configured-install entry point and reframe the automation
+  dashboard around processing coverage, current work, remaining documents and
+  recovery actions.
+- Add a dedicated Documents entry point for searching processed documents,
+  opening their Paperless originals and using the existing rescan/restore
+  workflow.
+
+### Ask Tagvico
+
+- Turn Companion into a deliberate three-column research workspace:
+  conversations on the left, the answer and model-aware composer in the centre,
+  and a visible research trail on the right.
+- Keep Paperless searches, document reads, result counts and safe source
+  metadata visible while an answer is generated instead of hiding them behind
+  an unexplained loading state.
+- Keep pending writes beside the research trail, with the existing exact
+  approve/reject boundary and read-only default.
+- Let read tools count, search and read documents as well as list and inspect
+  Paperless tags without an approval interruption. Document and tag creates,
+  updates and deletions always become durable approval cards first.
+- Group the live model picker by collapsible configured provider, show provider
+  icons, and expose only the reasoning efforts supported by the selected model.
+- Accept explicit shortcuts such as `doc://countdocuments` and prevent internal
+  non-document citation markers from leaking into answers.
+- Preserve durable new-chat, search, rename, guarded delete, stop, retry, copy
+  and configured-provider model selection behavior in the redesigned shell.
+
+### Tag organization and Settings
+
+- Move duplicate-tag cleanup out of a crowded Settings row into a dedicated
+  Organize tags workspace.
+- Explain the full safety sequence before analysis: inspect the current
+  vocabulary, review each many-to-one mapping, move affected documents, then
+  separately delete the unused source tag.
+- Show the configured provider, live model and model-specific thinking effort
+  directly beside the analysis controls.
+- Keep Settings focused on configuration while linking to operational cleanup
+  work, with clearer section hierarchy, buffered inputs and consistent inline
+  status surfaces.
+
+### Landing page and documentation
+
+- Rebuild the public landing page in the same Paper & Pine system as the
+  product, with a precise product illustration, workflow overview, inspectable
+  Companion, provider choice, tag-cleanup safety, privacy model, FAQ and pinned
+  Docker installation.
+- Update public installation examples to the immutable
+  `ghcr.io/arturict/tagvico-ai:3.2.0` image.
+- Keep this release inside the v3 documentation line. Existing v2 and earlier
+  guides remain versioned rather than being rewritten to match the new UI.
+
+### Upgrade note
+
+- Back up `tagvico_ai_data`, pull the pinned `3.2.0` image and recreate the
+  Tagvico container. No v4 migration or parallel beta preference is involved.
+- Review the renamed navigation once after upgrading. Existing history,
+  conversations, provider credentials, models, automation rules and recovery
+  queues remain in the current persistent data volume.
+
 ## 3.1.2 - 2026-07-24
 
 ### Ask Tagvico

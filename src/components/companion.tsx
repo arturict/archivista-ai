@@ -16,6 +16,7 @@ import {
   CircleAlert,
   Clipboard,
   FileSearch,
+  ListTree,
   LoaderCircle,
   Menu,
   MessageSquarePlus,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 import {
   companionToolActivity,
+  sanitizeCompanionText,
   type CompanionToolActivity as CompanionToolActivityModel
 } from '@root/contracts/companion';
 import {
@@ -49,6 +51,59 @@ type SessionSummary = {
   message_count?: number;
   updated_at: string;
 };
+
+function approvalCopy(approval: Approval) {
+  const payload = approval.payload || {};
+  const patch = payload.patch && typeof payload.patch === 'object'
+    ? payload.patch as Record<string, unknown>
+    : {};
+  if (approval.action_type === 'paperless.tag.create') {
+    return {
+      title: `Create tag “${String(payload.name || 'New tag')}”`,
+      meta: 'Paperless tag',
+      details: [String(payload.reason || '')].filter(Boolean)
+    };
+  }
+  if (approval.action_type === 'paperless.tag.update') {
+    return {
+      title: `Update tag “${String(payload.tagName || `#${payload.tagId}`)}”`,
+      meta: `${Number(payload.documentCount) || 0} linked documents`,
+      details: [
+        ...Object.entries(patch).map(([key, value]) => `${key}: ${String(value)}`),
+        String(payload.reason || '')
+      ].filter(Boolean)
+    };
+  }
+  if (approval.action_type === 'paperless.tag.delete') {
+    return {
+      title: `Delete tag “${String(payload.tagName || `#${payload.tagId}`)}”`,
+      meta: `${Number(payload.documentCount) || 0} linked documents`,
+      details: [String(payload.reason || '')].filter(Boolean)
+    };
+  }
+  if (approval.action_type === 'paperless.patch') {
+    return {
+      title: `Update ${String(payload.documentTitle || `document #${payload.documentId}`)}`,
+      meta: `Document #${String(payload.documentId || '')}`,
+      details: [
+        `Fields: ${Object.keys(patch).join(', ')}`,
+        String(payload.reason || '')
+      ].filter(Boolean)
+    };
+  }
+  if (approval.action_type === 'action.create') {
+    return {
+      title: String(payload.title || 'New action'),
+      meta: payload.paperlessDocumentId ? `Document #${payload.paperlessDocumentId}` : 'Action',
+      details: [String(payload.summary || '')].filter(Boolean)
+    };
+  }
+  return {
+    title: 'Update an action',
+    meta: 'Action',
+    details: Object.keys(patch).length ? [`Fields: ${Object.keys(patch).join(', ')}`] : []
+  };
+}
 
 const suggestions = [
   {
@@ -89,7 +144,8 @@ function ToolActivityCard({ activity }: { activity: CompanionToolActivityModel }
         : ShieldCheck;
   const query = String(activity.input?.query || '').trim();
   const documents = activity.result?.documents || [];
-  const hasDetails = Boolean(query || documents.length || activity.result?.count !== undefined);
+  const tags = activity.result?.tags || [];
+  const hasDetails = Boolean(query || documents.length || tags.length || activity.result?.count !== undefined);
 
   return <details className={`companion-tool is-${activity.status}`} open={activity.status === 'failed'}>
     <summary>
@@ -119,20 +175,32 @@ function ToolActivityCard({ activity }: { activity: CompanionToolActivityModel }
           {document.created ? <small>{document.created}</small> : null}
         </li>)}
       </ul> : null}
+      {tags.length ? <ul>
+        {tags.map((tag) => <li key={tag.id}>
+          <span className="companion-document-id">#{tag.id}</span>
+          <strong>{tag.name}</strong>
+          {tag.documentCount !== undefined ? <small>{tag.documentCount} document{tag.documentCount === 1 ? '' : 's'}</small> : null}
+        </li>)}
+      </ul> : null}
       <small className="companion-tool-privacy">Only safe metadata is shown here. Document text stays inside the selected model runtime.</small>
     </div> : null}
   </details>;
 }
 
 function ToolActivity({ part }: { part: UIMessage['parts'][number] }) {
-  if (!isToolUIPart(part)) return null;
-  const activity = companionToolActivity(
+  const activity = activityFromPart(part);
+  if (!activity) return null;
+  return <ToolActivityCard activity={activity} />;
+}
+
+function activityFromPart(part: UIMessage['parts'][number]): CompanionToolActivityModel | null {
+  if (!isToolUIPart(part)) return storedActivity(part);
+  return companionToolActivity(
     getToolName(part),
     part.state,
     'input' in part ? part.input : undefined,
     'output' in part ? part.output : undefined
   );
-  return <ToolActivityCard activity={activity} />;
 }
 
 function storedActivity(part: UIMessage['parts'][number]): CompanionToolActivityModel | null {
@@ -172,7 +240,7 @@ export function Companion({
   const [editingSession, setEditingSession] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState('');
-  const [approvalsOpen, setApprovalsOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
@@ -198,6 +266,12 @@ export function Companion({
       ? sessions.filter((session) => `${session.title} ${session.preview || ''}`.toLowerCase().includes(query))
       : sessions;
   }, [sessionSearch, sessions]);
+  const researchActivity = useMemo(
+    () => messages.flatMap((message) => message.parts.map(activityFromPart).filter(
+      (activity): activity is CompanionToolActivityModel => Boolean(activity)
+    )),
+    [messages]
+  );
 
   useEffect(() => setSessions(initialSessions), [initialSessions]);
   useEffect(() => {
@@ -331,7 +405,7 @@ export function Companion({
   const copyMessage = async (message: UIMessage) => {
     const text = message.parts
       .filter((part): part is Extract<UIMessage['parts'][number], { type: 'text' }> => part.type === 'text')
-      .map((part) => part.text)
+      .map((part) => sanitizeCompanionText(part.text))
       .join('\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -342,7 +416,7 @@ export function Companion({
     }
   };
 
-  return <div className={`companion-studio${approvalsOpen && approvals.length ? ' has-approvals' : ''}`}>
+  return <div className={`companion-studio${inspectorOpen ? ' has-inspector' : ''}`}>
     <aside className={`companion-sidebar panel${sessionsOpen ? ' is-sessions-open' : ''}`} aria-label="Conversations">
       <div className="companion-sidebar-head">
         <div>
@@ -399,10 +473,14 @@ export function Companion({
           <strong>{currentSession?.title || 'New conversation'}</strong>
           <small>{isWorking ? 'Working with your selected model…' : 'Ready to research your Paperless library'}</small>
         </div>
-        {approvals.length ? <button type="button" className="companion-approval-toggle" onClick={() => setApprovalsOpen((value) => !value)}>
-          <ShieldCheck aria-hidden="true" />
-          {approvals.length} approval{approvals.length === 1 ? '' : 's'}
-        </button> : <span className="companion-readonly-badge"><ShieldCheck aria-hidden="true" /> Read-only by default</span>}
+        <button type="button" className="companion-approval-toggle" onClick={() => setInspectorOpen((value) => !value)} aria-expanded={inspectorOpen}>
+          <ListTree aria-hidden="true" />
+          {researchActivity.length
+            ? `${researchActivity.length} research step${researchActivity.length === 1 ? '' : 's'}`
+            : approvals.length
+              ? `${approvals.length} approval${approvals.length === 1 ? '' : 's'}`
+              : 'Research trail'}
+        </button>
       </header>
 
       <div className="companion-messages" aria-live="polite">
@@ -422,7 +500,7 @@ export function Companion({
           <MessageContent>
             {message.parts.map((part, index) => {
               if (part.type === 'text') return message.role === 'assistant'
-                ? <MessageResponse key={index} isAnimating={isWorking && messageIndex === messages.length - 1}>{part.text}</MessageResponse>
+                ? <MessageResponse key={index} isAnimating={isWorking && messageIndex === messages.length - 1}>{sanitizeCompanionText(part.text)}</MessageResponse>
                 : <span key={index}>{part.text}</span>;
               if (isToolUIPart(part)) return <ToolActivity key={index} part={part} />;
               const activity = storedActivity(part);
@@ -473,23 +551,42 @@ export function Companion({
       </form>
     </section>
 
-    {approvalsOpen && approvals.length ? <aside className="companion-approvals panel" aria-label="Pending approvals">
+    {inspectorOpen ? <aside className="companion-approvals companion-research panel" aria-label="Research trail and pending approvals">
       <header>
-        <div><span className="eyebrow">Nothing changes silently</span><h2>Pending approvals</h2></div>
-        <button className="companion-icon-button" type="button" onClick={() => setApprovalsOpen(false)} aria-label="Close approvals"><X /></button>
+        <div><span className="eyebrow">Visible by default</span><h2>Research trail</h2></div>
+        <button className="companion-icon-button" type="button" onClick={() => setInspectorOpen(false)} aria-label="Close research trail"><X /></button>
       </header>
-      <p className="muted">Review the exact proposal before Tagvico writes anything.</p>
-      <div>
-        {approvals.map((approval) => <article className="approval" key={approval.id}>
-          <span className="pill suggested">proposal</span>
-          <h3>{approval.action_type === 'action.create' ? String(approval.payload.title || 'New action') : 'Update an action'}</h3>
-          <p>{approval.payload.paperlessDocumentId ? `Document #${approval.payload.paperlessDocumentId}` : 'Review details before approving.'}</p>
+      <p className="muted">Every Paperless search and document read used for this answer appears here.</p>
+      <div className="companion-research-steps">
+        {researchActivity.length
+          ? researchActivity.map((activity, index) => <ToolActivityCard key={`${activity.toolName}-${index}`} activity={activity} />)
+          : <div className="companion-research-empty">
+            <FileSearch aria-hidden="true" />
+            <strong>No research yet</strong>
+            <span>Ask a question and the steps will appear here as they run.</span>
+          </div>}
+      </div>
+      {approvals.length ? <div className="companion-approval-section">
+        <div className="companion-approval-section-head">
+          <span className="eyebrow">Nothing changes silently</span>
+          <strong>{approvals.length} pending approval{approvals.length === 1 ? '' : 's'}</strong>
+        </div>
+        {approvals.map((approval) => {
+          const copy = approvalCopy(approval);
+          return <article className="approval companion-approval-card" key={approval.id}>
+          <span className="pill suggested">approval required</span>
+          <h3>{copy.title}</h3>
+          <p>{copy.meta}</p>
+          {copy.details.length ? <ul className="companion-approval-details">
+            {copy.details.map((detail) => <li key={detail}>{detail}</li>)}
+          </ul> : null}
           {canApprove ? <div className="approval-actions">
             <button type="button" className="button primary" disabled={!!decisionBusy} onClick={() => void decide(approval.id, 'approved')}>Approve</button>
             <button type="button" className="button danger" disabled={!!decisionBusy} onClick={() => void decide(approval.id, 'rejected')}>Reject</button>
           </div> : <p className="muted">Your role cannot decide this proposal.</p>}
-        </article>)}
-      </div>
+        </article>;
+        })}
+      </div> : null}
     </aside> : null}
   </div>;
 }

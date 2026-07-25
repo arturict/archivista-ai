@@ -17,7 +17,6 @@ const db = new Database(databasePath, {
   timeout: 30000
 });
 db.pragma('busy_timeout = 30000');
-db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 interface OriginalSnapshot {
@@ -444,6 +443,10 @@ function initializeSchemaWithProcessLock() {
     lockDatabase.exec('CREATE TABLE IF NOT EXISTS migration_lock (id INTEGER PRIMARY KEY CHECK (id = 1))');
     lockDatabase.exec('BEGIN EXCLUSIVE');
     try {
+      // Switching journal mode can itself require an exclusive database lock.
+      // Keep it inside the cross-process migration lock so parallel starts do
+      // not race before the schema lock has taken effect.
+      db.pragma('journal_mode = WAL');
       initializeSchema();
       lockDatabase.exec('COMMIT');
     } catch (error) {

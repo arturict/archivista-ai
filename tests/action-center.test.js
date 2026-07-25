@@ -41,6 +41,8 @@ test('action center provisions solo households, multi-step cases, and approval a
     assert.equal(actions.decideApproval(workspace.id, approval.id, workspace.member_id, 'approved').status, 'approved');
     const adultApproval = actions.createApproval(workspace.id, null, member.id, 'action.update', { caseId: created.id, patch: { status: 'waiting' } });
     assert.equal(actions.decideApproval(workspace.id, adultApproval.id, adult.id, 'rejected').status, 'rejected');
+    const tagApproval = actions.createApproval(workspace.id, null, workspace.member_id, 'paperless.tag.delete', { tagId: 7, tagName: 'Duplicate' });
+    assert.equal(tagApproval.action_type, 'paperless.tag.delete');
     assert.throws(() => actions.createApproval(workspace.id, null, workspace.member_id, 'shell.run', {}), /Unsupported/);
     assert.throws(() => actions.createApproval(workspace.id, null, workspace.member_id, 'action.create', { text: 'x'.repeat(129 * 1024) }), /too large/);
     const firstSession = actions.getOrCreateSession(workspace.id, workspace.member_id, 'web');

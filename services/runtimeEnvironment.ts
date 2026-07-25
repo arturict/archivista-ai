@@ -21,7 +21,11 @@ function savedEnvironment(): Record<string, string> {
  */
 export function runtimeEnvironmentValue(name: string, fallback: unknown = '') {
   const injected = config.injectedEnvironment instanceof Set && config.injectedEnvironment.has(name);
-  if (injected && process.env[name] !== undefined) return String(process.env[name]).trim();
+  const injectedValue = String(process.env[name] ?? '').trim();
+  // Docker Compose commonly injects optional settings as an empty string.
+  // Treat that as "not supplied" so a value saved from Settings remains usable.
+  // A non-empty host/container value still has strict precedence.
+  if (injected && injectedValue) return injectedValue;
   const saved = savedEnvironment()[name];
-  return String(saved ?? process.env[name] ?? fallback ?? '').trim();
+  return String(saved ?? injectedValue ?? fallback ?? '').trim();
 }

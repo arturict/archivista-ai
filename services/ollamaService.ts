@@ -16,7 +16,11 @@ const { loadThumbnail } = require('./thumbnailHelper');
 type AnalysisOptions = { externalApiData?: unknown };
 type JsonSchema = Record<string, unknown>;
 type NamedValue = string | { name: string };
-type OllamaResponseData = { response?: string | { tags?: unknown; correspondent?: unknown; title?: unknown; document_date?: unknown; document_type?: unknown; language?: unknown; custom_fields?: unknown } };
+type OllamaResponseData = {
+    response?: string | { tags?: unknown; correspondent?: unknown; title?: unknown; document_date?: unknown; document_type?: unknown; language?: unknown; custom_fields?: unknown };
+    prompt_eval_count?: number;
+    eval_count?: number;
+};
 const errorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 /**
@@ -191,11 +195,7 @@ class OllamaService {
             // Return results in consistent format
             return {
                 document: parsedResponse,
-                metrics: {
-                    promptTokens: 0,  // Ollama doesn't provide token metrics
-                    completionTokens: 0,
-                    totalTokens: 0
-                },
+                metrics: this._metricsFromOllamaResponse(response),
                 truncated: false
             };
         } catch (error) {
@@ -243,11 +243,7 @@ class OllamaService {
             // Return results in consistent format
             return {
                 document: parsedResponse,
-                metrics: {
-                    promptTokens: 0,
-                    completionTokens: 0,
-                    totalTokens: 0
-                },
+                metrics: this._metricsFromOllamaResponse(response),
                 truncated: false
             };
         } catch (error) {
@@ -569,6 +565,10 @@ class OllamaService {
             prompt: prompt,
             system: systemPrompt,
             stream: false,
+            // Reasoning models such as Qwen 3.5 and Ornith otherwise place the
+            // schema result in Ollama's `thinking` field and leave `response`
+            // empty. Document analysis needs the JSON in `response`.
+            think: false,
             format: schema,
             options: {
                 temperature: 0.7,
@@ -613,6 +613,16 @@ class OllamaService {
         } else {
             throw new Error('No response data from Ollama API');
         }
+    }
+
+    _metricsFromOllamaResponse(responseData: OllamaResponseData) {
+        const promptTokens = Number.isFinite(responseData.prompt_eval_count) ? Number(responseData.prompt_eval_count) : 0;
+        const completionTokens = Number.isFinite(responseData.eval_count) ? Number(responseData.eval_count) : 0;
+        return {
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens
+        };
     }
 
     /**

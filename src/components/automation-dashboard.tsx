@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, FilePenLine, FileStack, Gauge, RefreshCw, ScanLine, ShieldAlert, Stamp, Tags, UsersRound, X } from 'lucide-react';
 import { fetchJson } from '@/lib/client/fetch-json';
 import { WorkspaceLoadError } from '@/components/workspace-load-error';
+import { WorkspacePageSkeleton } from '@/components/workspace-page-skeleton';
 
 type DashboardSummary = {
   counts: {
@@ -144,12 +145,12 @@ export function AutomationDashboard() {
   return <div className="page operations-page">
     <header className="page-head operations-page-head">
       <div>
-        <p className="eyebrow">Document processing</p>
-        <h1>Automation</h1>
-        <p className="lede">Processing health, Paperless coverage and model efficiency in one live workspace.</p>
+        <p className="eyebrow">Your Paperless workspace</p>
+        <h1>Paperless, under control.</h1>
+        <p className="lede">A clear view of what Tagvico processed, what still needs attention and what is happening right now.</p>
       </div>
       <div className="workspace-actions">
-        <Link className="button" href="/review"><Stamp aria-hidden="true" /> Review queue</Link>
+        <Link className="button" href="/actions"><Stamp aria-hidden="true" /> Open actions</Link>
         <Link className="button" href="/automation/manual"><FilePenLine aria-hidden="true" /> Manual</Link>
         <Link className="button" href="/automation/recovery"><ShieldAlert aria-hidden="true" /> Recovery</Link>
         <button className="button primary" type="button" onClick={scan} disabled={busy}>
@@ -171,9 +172,7 @@ export function AutomationDashboard() {
       message={loadError}
       retrying={loading}
       onRetry={() => void load()}
-    /> : !summary ? <section className="workspace-skeleton" aria-label="Loading dashboard">
-      {Array.from({ length: 4 }, (_, index) => <span key={index} />)}
-    </section> : <>
+    /> : !summary ? <WorkspacePageSkeleton kind="dashboard" /> : <>
       <section className="metric-grid" aria-label="Document automation metrics">
         <Metric icon={<FileStack />} label="Processed" value={integer.format(summary.counts.processed)} detail={`${summary.counts.processedPct}% of ${integer.format(summary.counts.documents)} visible`} />
         <Metric icon={<Activity />} label="Processed today" value={integer.format(processing.processedToday ?? summary.today.total)} detail="Scheduled and manual scans" />
