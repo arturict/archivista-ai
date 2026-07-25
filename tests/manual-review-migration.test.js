@@ -24,8 +24,11 @@ test('review queue API authenticates reads and gates every decision by origin an
   assert.match(decision, /assertSameOrigin\(request\)/);
   assert.match(decision, /requireApiUser\(\)/);
   assert.match(decision, /assertCanMutateWorkspace\(workspaceFor\(user\)\.role\)/);
-  assert.match(decision, /reviewService\.applySuggestion\(id,\s*actor\)/);
-  assert.match(decision, /reviewService\.rejectSuggestion\(id,\s*actor/);
+  assert.match(list, /backendBearerHeaders\(request\)/);
+  assert.match(list, /\/api\/review-queue/);
+  assert.match(decision, /backendBearerHeaders\(request\)/);
+  assert.match(decision, /\/review\/\$\{id\}\/\$\{body\.action\}/);
+  assert.match(source('routes/setup.ts'), /router\.get\(['"]\/api\/review-queue['"]/);
   assert.doesNotMatch(decision, /proposed_metadata|original_metadata/);
 });
 

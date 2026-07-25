@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return <AppNavigationShell
     workspaceName={workspace.name}
     userLabel={`${user.username} · ${workspace.role}`}
+    workspaceRole={workspace.role}
     initialWriteMode={settings.automation.writeMode}
   >
     {children}

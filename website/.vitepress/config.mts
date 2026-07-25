@@ -9,7 +9,7 @@ const availableVersions = readdirSync(versionsRoot, { withFileTypes: true })
   .map((entry) => entry.name)
   .sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)));
 const latestVersion = availableVersions[0];
-const currentRelease = 'v3.1.2';
+const currentRelease = 'v3.2.0';
 const displayVersion = (targetVersion: string) =>
   targetVersion === latestVersion ? currentRelease.toUpperCase() : targetVersion.toUpperCase();
 const base = process.env.TAGVICO_DOCS_BASE || '/docs/';
@@ -29,12 +29,12 @@ export default defineConfig({
   outDir,
   cleanUrls: true,
   lastUpdated: process.env.TAGVICO_DOCS_LAST_UPDATED !== 'false',
-  appearance: true,
+  appearance: false,
   head: [
     ['link', { rel: 'icon', type: 'image/x-icon', href: `${base}favicon.ico` }],
     ['link', { rel: 'alternate', type: 'text/plain', href: `${base}llms.txt`, title: 'LLM documentation index' }],
     ['link', { rel: 'alternate', type: 'text/plain', href: `${base}llms-full.txt`, title: 'Complete LLM documentation' }],
-    ['meta', { name: 'theme-color', content: '#c8ff2e' }],
+    ['meta', { name: 'theme-color', content: '#174c35' }],
   ],
   themeConfig: {
     logo: '/tagvico-icon.png',

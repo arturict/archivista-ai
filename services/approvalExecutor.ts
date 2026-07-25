@@ -29,6 +29,32 @@ export async function executeApproval(householdId: string, approvalId: string, m
         result = await sync.patchPaperlessDocument(householdId, memberId, payload.documentId, payload.patch);
         break;
       }
+      case 'paperless.tag.create': {
+        const payload = approval.payload as { name: string; color?: string; textColor?: string };
+        result = await sync.createPaperlessTag(householdId, memberId, payload);
+        break;
+      }
+      case 'paperless.tag.update': {
+        const payload = approval.payload as {
+          tagId: number;
+          patch: { name?: string; color?: string; textColor?: string };
+        };
+        result = await sync.updatePaperlessTag(householdId, memberId, payload.tagId, payload.patch);
+        break;
+      }
+      case 'paperless.tag.delete': {
+        const payload = approval.payload as { tagId: number; tagName?: string; documentCount?: number };
+        const expectedName = String(payload.tagName || '').trim();
+        const expectedDocumentCount = Number(payload.documentCount);
+        if (!expectedName || !Number.isSafeInteger(expectedDocumentCount) || expectedDocumentCount < 0) {
+          throw new Error('Tag deletion approval is missing its verified impact snapshot');
+        }
+        result = await sync.deletePaperlessTag(householdId, memberId, payload.tagId, {
+          name: expectedName,
+          documentCount: expectedDocumentCount
+        });
+        break;
+      }
       default:
         throw new Error(`Unsupported approval action: ${approval.action_type}`);
     }

@@ -1,4 +1,4 @@
-# Tagvico 3.1 landing preview
+# Tagvico 3.2 landing preview
 
 This image serves only the standalone landing page from `docs/index.html`.
 Documentation links are redirected to the currently deployed documentation

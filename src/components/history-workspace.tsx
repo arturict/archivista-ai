@@ -62,7 +62,7 @@ type ConfirmState =
   | { kind: 'rescanAll' }
   | { kind: 'cleanup'; count: number };
 
-export function HistoryWorkspace() {
+export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'documents' }) {
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [filters, setFilters] = useState<FilterPayload>({ tags: [], correspondents: [] });
   const [search, setSearch] = useState('');
@@ -196,9 +196,11 @@ export function HistoryWorkspace() {
   return <div className="page operations-page">
     <header className="page-head operations-page-head">
       <div>
-        <p className="eyebrow">Audit trail</p>
-        <h1>Activity</h1>
-        <p className="lede">Inspect every AI decision, token count and original value. Rescan safely or restore the first saved state.</p>
+        <p className="eyebrow">{view === 'documents' ? 'Paperless archive' : 'Audit trail'}</p>
+        <h1>{view === 'documents' ? 'Documents' : 'Activity'}</h1>
+        <p className="lede">{view === 'documents'
+          ? 'Find every document Tagvico has handled, inspect its filing and open the original in Paperless.'
+          : 'Inspect every automated decision, token count and original value. Rescan safely or restore the first saved state.'}</p>
       </div>
       <div className="workspace-actions">
         <button className="button" type="button" onClick={() => void validateHistory()}><ShieldCheck /> Validate history</button>
@@ -225,8 +227,10 @@ export function HistoryWorkspace() {
         title="History is unavailable"
         message={loadError}
         onRetry={() => void load()}
-      /> : loadState === 'loading' && !rows.length ? <div className="workspace-skeleton" aria-label="Loading history">
-        {Array.from({ length: 4 }, (_, index) => <span key={index} />)}
+      /> : loadState === 'loading' && !rows.length ? <div className="workspace-table-skeleton" aria-label="Loading history">
+        {Array.from({ length: 7 }, (_, index) => <span key={index}>
+          <i /><b /><small /><em />
+        </span>)}
       </div> : rows.length ? <div className="workspace-table-wrap">
         <table className="workspace-table">
           <thead><tr><th className="check-column"><span className="sr-only">Select</span></th><th>Document</th><th>Tags</th><th>Correspondent</th><th>Actions</th></tr></thead>

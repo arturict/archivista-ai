@@ -123,7 +123,9 @@ export function ModelPicker({
               </button>
             </div>
             <div className="settings-model-list">
-              {loading ? <div className="settings-model-empty">Loading the runtime catalog…</div> : null}
+              {loading ? <div className="model-catalog-skeleton" aria-label="Loading the runtime catalog">
+                {Array.from({ length: 6 }, (_, index) => <span key={index}><i /><b /><small /></span>)}
+              </div> : null}
               {!loading && error ? <div className="settings-model-empty is-error">{error}</div> : null}
               {!loading && !error && !visibleModels.length ? <div className="settings-model-empty">
                 {provider?.manualModelInput
@@ -140,6 +142,9 @@ export function ModelPicker({
                         <small>{model.id}</small>
                         <span className="settings-capabilities">
                           {model.isDefault ? <span>Runtime default</span> : null}
+                          {model.capabilities.includes('tools') ? <span>Tools</span> : null}
+                          {model.capabilities.includes('vision') ? <span>Vision</span> : null}
+                          {model.capabilities.includes('thinking') ? <span>Thinking</span> : null}
                           {model.options.map((option) => <span key={option.id}>{option.label}</span>)}
                           {model.contextWindow ? <span>{Math.round(model.contextWindow / 1000)}k context</span> : null}
                         </span>

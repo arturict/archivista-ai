@@ -22,7 +22,6 @@ import { PaperlessDiscovery } from './paperless-discovery';
 import { SettingSwitch } from './setting-switch';
 import { SettingsRow, SettingsSection } from './settings-section';
 import { TagGroupCard } from './tag-group-card';
-import { TagUnification } from './tag-unification';
 import { ProviderIcon } from '@/components/provider-icon';
 import type {
   ModelDescriptor,
@@ -754,18 +753,13 @@ export function SettingsWorkspace({
         </SettingsSection>
         <SettingsSection
           title="Unify duplicate tags"
-          description="Use one of your configured live models to find likely duplicates, then approve every merge separately."
+          description="Tag cleanup now has a dedicated review workspace with a clear many-to-one impact preview."
         >
           <SettingsRow
-            title="Review-first tag cleanup"
-            description="The AI can propose pairs only. Document moves and deletion remain explicit, separate and auditable."
-            stack
+            title="Open tag organizer"
+            description="Analysis is read-only. Moving documents and deleting the unused source remain explicit, separate and auditable."
           >
-            <TagUnification
-              providers={settings.ai.providers}
-              activeProviderId={settings.ai.activeProviderInstanceId}
-              activeModelId={settings.ai.activeModelId}
-            />
+            <Link className="settings-button is-primary" href="/tags">Organize tags</Link>
           </SettingsRow>
         </SettingsSection>
         <SettingsSection title="Assigned metadata">

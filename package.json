@@ -1,6 +1,6 @@
 {
   "name": "tagvico-ai",
-  "version": "3.1.2",
+  "version": "3.2.0",
   "description": "Tagvico — the private action center and household companion for Paperless-ngx.",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || ^24.0.0"
@@ -11,6 +11,7 @@
     "start:backend": "node dist/server.js",
     "start:web": "next start -p 3000",
     "auth:copilot": "node scripts/copilot-login.js",
+    "benchmark:ollama": "node scripts/benchmark-ollama-models.mjs",
     "dev": "next dev -p 3000",
     "dev:backend": "npm run build:backend && set TAGVICO_AI_PORT=3001&& nodemon --watch services --watch routes --watch models --watch config --watch server.ts --ext ts,json --exec \"npm run build:backend && node dist/server.js\"",
     "build": "npm run build:backend && npm run build:web",
@@ -82,7 +83,7 @@
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
-    "ejs": "^3.1.10",
+    "ejs": "6.0.1",
     "express": "^4.21.2",
     "geist": "1.7.0",
     "jsonwebtoken": "^9.0.2",

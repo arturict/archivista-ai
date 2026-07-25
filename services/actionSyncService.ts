@@ -196,6 +196,105 @@ export async function listRecentPaperlessDocuments(
   return Array.isArray(response.data?.results) ? response.data.results : [];
 }
 
+export async function listPaperlessTags(
+  householdId: string,
+  memberId: string | null,
+  query = '',
+  limit = 100
+) {
+  const client = clientFor(householdId, memberId);
+  const pageSize = Math.max(1, Math.min(200, Math.trunc(Number(limit) || 100)));
+  const response = await client.get('/tags/', {
+    params: {
+      ...(String(query).trim() ? { name__icontains: String(query).trim().slice(0, 200) } : {}),
+      ordering: '-document_count,name',
+      page_size: pageSize
+    }
+  });
+  return Array.isArray(response.data?.results)
+    ? response.data.results.map((tag: Record<string, unknown>) => ({
+        id: Number(tag.id),
+        name: String(tag.name || ''),
+        color: tag.color ? String(tag.color) : null,
+        textColor: tag.text_color ? String(tag.text_color) : null,
+        documentCount: Math.max(0, Number(tag.document_count) || 0)
+      })).filter((tag: { id: number; name: string }) => Number.isSafeInteger(tag.id) && tag.id > 0 && tag.name)
+    : [];
+}
+
+export async function getPaperlessTag(householdId: string, memberId: string | null, tagId: number) {
+  const client = clientFor(householdId, memberId);
+  const response = await client.get(`/tags/${tagId}/`);
+  const tag = response.data as Record<string, unknown>;
+  return {
+    id: Number(tag.id),
+    name: String(tag.name || ''),
+    color: tag.color ? String(tag.color) : null,
+    textColor: tag.text_color ? String(tag.text_color) : null,
+    documentCount: Math.max(0, Number(tag.document_count) || 0),
+    matchingAlgorithm: tag.matching_algorithm ? Number(tag.matching_algorithm) : null,
+    isInsensitive: Boolean(tag.is_insensitive)
+  };
+}
+
+export async function createPaperlessTag(
+  householdId: string,
+  memberId: string | null,
+  input: { name: string; color?: string; textColor?: string }
+) {
+  const client = clientFor(householdId, memberId);
+  const name = String(input.name || '').trim();
+  if (!name || name.length > 128) throw new Error('Tag name must contain 1 to 128 characters');
+  const body = {
+    name,
+    ...(input.color ? { color: String(input.color).slice(0, 32) } : {}),
+    ...(input.textColor ? { text_color: String(input.textColor).slice(0, 32) } : {})
+  };
+  const response = await client.post('/tags/', body);
+  return { ok: true, tag: await getPaperlessTag(householdId, memberId, Number(response.data?.id)) };
+}
+
+export async function updatePaperlessTag(
+  householdId: string,
+  memberId: string | null,
+  tagId: number,
+  patch: { name?: string; color?: string; textColor?: string }
+) {
+  const client = clientFor(householdId, memberId);
+  const safePatch = {
+    ...(patch.name !== undefined ? { name: String(patch.name).trim().slice(0, 128) } : {}),
+    ...(patch.color !== undefined ? { color: String(patch.color).slice(0, 32) } : {}),
+    ...(patch.textColor !== undefined ? { text_color: String(patch.textColor).slice(0, 32) } : {})
+  };
+  if (safePatch.name !== undefined && !safePatch.name) throw new Error('Tag name cannot be empty');
+  if (!Object.keys(safePatch).length) throw new Error('No supported tag fields were requested');
+  const before = await getPaperlessTag(householdId, memberId, tagId);
+  await client.patch(`/tags/${tagId}/`, safePatch);
+  const after = await getPaperlessTag(householdId, memberId, tagId);
+  return { ok: true, tagId, before, after };
+}
+
+export async function deletePaperlessTag(
+  householdId: string,
+  memberId: string | null,
+  tagId: number,
+  expected?: { name: string; documentCount: number }
+) {
+  const client = clientFor(householdId, memberId);
+  const before = await getPaperlessTag(householdId, memberId, tagId);
+  if (expected && (
+    before.name !== expected.name
+    || before.documentCount !== expected.documentCount
+  )) {
+    throw new Error(
+      `Tag changed after approval: expected “${expected.name}” with ${expected.documentCount} linked documents, `
+      + `found “${before.name}” with ${before.documentCount}. Review the deletion again.`
+    );
+  }
+  await client.delete(`/tags/${tagId}/`);
+  return { ok: true, tagId, deleted: before };
+}
+
 type ReconciliationResult = { checked: number; changed: number; failed: number };
 let activeReconciliation: Promise<ReconciliationResult> | null = null;
 

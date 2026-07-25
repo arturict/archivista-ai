@@ -1,6 +1,6 @@
 # Feature showcase
 
-## Action Center
+## Home and action workflows
 
 Each Paperless document can have one Action Case with a title, summary,
 priority, due date, assignee, and top-level state. A case may contain up to 100
@@ -16,32 +16,41 @@ Tagvico mirrors its case ID, state, next due date, assignee, and
 `tagvico/action` tag to Paperless. It preserves unrelated tags and custom
 fields. The complete checklist and audit trail remain in Tagvico.
 
-![Tagvico v3.1.2 Action Center in the current green application shell](/screenshots/action-center-green-v3.png)
+![Tagvico v3.2 Home dashboard in the Paper and Pine application shell](/screenshots/home-paper-pine-v3.png)
 
-This v3.1.2 capture comes from the representative release installation and
-contains no document or account data.
+This v3.2 capture comes from the representative release installation. It uses
+generic document metadata and synthetic workspace labels. It exposes no
+document contents, real account identifiers, credentials, or private endpoints.
 
 ## Household Companion and approvals
 
-The Companion can search and read permitted Paperless documents, list current
-actions, and prepare new or changed Action Cases. The Tagvico harness owns the
+The Companion can count, search and read permitted Paperless documents, list
+and inspect tags, list current actions, and prepare document, tag or Action
+Case changes. The Tagvico harness owns the
 session, narrow tool catalog, permissions, transcript, and approval records;
 the selected model never receives shell or filesystem access.
 
 Read tools run immediately. Write tools only create a durable proposal. An
 owner or adult must approve it before the deterministic executor changes
-Tagvico or Paperless. The web chat uses AI SDK v6 streams and AI Elements.
+Tagvico or Paperless. This includes creating, renaming, recoloring and deleting
+tags as well as changing document metadata. The web chat uses AI SDK v6 streams and AI Elements.
 Paperless research is intent-aware: a greeting stays a normal conversation,
-library totals use an exact count, and document content is read only when the
-question requires it. Each research card can reveal the safe search term,
+library totals, including `doc://countdocuments`, use an exact count, and
+document content is read only when the question requires it. Internal tool
+markers are never shown as document citations. Each research card can reveal the safe search term,
 matching document IDs, titles, dates, and result count without exposing OCR.
-Approvals appear only when a proposal is pending, and conversations can be
-created, searched, renamed, switched, and deleted from the chat workspace.
+The right-hand research trail remains visible while tools run and groups safe
+research evidence with any pending approvals. Conversations can be created,
+searched, renamed, switched, and deleted from the chat workspace.
+The composer model picker groups live models inside collapsible configured
+providers, shows each provider identity, and offers only the reasoning efforts
+advertised by the selected model.
 
-![Tagvico v3.1.2 Ask Tagvico workspace with persistent conversations, approval boundary, composer and configured model](/screenshots/companion-green-v3.png)
+![Tagvico v3.2 Ask Tagvico workspace with persistent conversations, approval boundary, composer, configured model and visible research trail](/screenshots/companion-paper-pine-v3.png)
 
-The capture uses a generic greeting only. No document contents, private
-identifiers, credentials, or provider payloads are visible.
+The capture uses generic count queries and synthetic workspace labels to show
+the research trail. No document contents, real account identifiers,
+credentials, or provider payloads are visible.
 
 ## Operations at a glance
 
@@ -51,11 +60,15 @@ an on-demand pass without waiting for the schedule and reports how many
 documents were eligible, applied, staged, skipped, or failed. Trigger tags are
 optional: with no trigger tags, every new unprocessed document is eligible.
 
-Actions, Ask Tagvico, Automation, Review queue, Activity, and Settings stay
-inside one React application shell. Recovery and Manual processing are
-purposeful Automation subpages rather than unexplained primary tabs. They share the same fixed,
-collapsible navigation, Geist typography, green design tokens, responsive
-tables, dialogs, loading states, and inline feedback. The former EJS interfaces
+Home, Documents, Ask Tagvico, Organize tags, Activity, and Settings stay
+inside one React application shell. Recovery, Manual processing, the Action
+Center, and the conditional Review queue remain available from the workflows
+that need them instead of competing as unexplained primary tabs. They share the same fixed,
+collapsible navigation, Paper & Pine design tokens, responsive
+tables, dialogs, high-contrast tags and controls, and inline feedback.
+Page-shaped skeletons preserve the expected Home, Documents and Activity
+layout while their live data is loading. Provider and model catalogs use the
+same pattern instead of replacing the interface with loading text. The former EJS interfaces
 for user-facing workflows are no longer part of the visible application.
 
 ## Controlled tagging
@@ -69,7 +82,7 @@ type as tags.
 
 ## Review-first tag unification
 
-Tag library can load the current Paperless vocabulary and let one configured,
+The dedicated **Organize tags** workspace loads the current Paperless vocabulary and lets one configured,
 live-discovered model propose likely duplicates. Suggestions are grouped
 visually as several source tags becoming one canonical target, while every
 source remains independently reviewable. The model only plans and explains; it
@@ -77,6 +90,12 @@ cannot write to Paperless. Every proposed merge is approved or rejected
 separately. Approved work runs as two explicit, idempotent phases: move
 document references to the chosen target, verify the result, then delete the
 now-unused source tag.
+
+![Tagvico v3.2 Organize tags workspace showing several source tags becoming one canonical target](/screenshots/tags-paper-pine-v3.png)
+
+The representative capture uses generic duplicate tags and synthetic workspace
+labels. It contains no document content, real account identifiers, credentials,
+or endpoints.
 
 ## Prompt control
 
@@ -128,9 +147,9 @@ forever.
 ## In-product changelog
 
 **What’s new** in the sidebar opens the release notes bundled with the running
-instance. The top **Next** entry documents improvements present in the current
-build but not yet assigned to a release number; older released notes stay
-available below it.
+instance. The top entry is the prepared v3.2.0 changelog, followed by the
+complete v3.1 history. It stays marked as unreleased until the release image
+and tag are actually published.
 
 ## Subscription-backed model access
 
@@ -152,6 +171,11 @@ without a second legacy UI.
 Provider configuration is generated from the central provider registry. The
 model picker supports runtime discovery, search, provider grouping, local
 favorites, capability badges, and keyboard-native controls.
+
+![Tagvico v3.2 AI model settings with the provider registry and write-only credential boundary](/screenshots/ai-models-paper-pine-v3.png)
+
+This capture shows provider names and product copy only. No API key, account
+identifier, private endpoint, or signed-in profile is exposed.
 
 The Ask Tagvico composer uses the same runtime catalog, but includes only
 configured providers whose live discovery succeeded. It defaults to the
@@ -180,11 +204,6 @@ When a Telegram allowlist entry also contains its Tagvico `householdId` and
 approve/reject cards. Approval uses the same executor and audit trail as web.
 Action Center linking is accepted only when the Telegram entry points at the
 same Paperless instance as the main Tagvico configuration.
-
-![Tagvico v3.1.2 AI model settings with the supported provider registry and write-only credential boundary](/screenshots/ai-models-green-v3.png)
-
-This capture shows provider names and product copy only. No API key, account
-identifier, private endpoint, or signed-in profile is exposed.
 
 ## Optional anonymous installation analytics
 

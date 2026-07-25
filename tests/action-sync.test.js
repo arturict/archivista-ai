@@ -26,14 +26,37 @@ test('action sync retries local writes, isolates member credentials, and redacts
 
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1');
+    const tagDetail = url.pathname.match(/^\/api\/tags\/(\d+)\/$/);
+    if (tagDetail) {
+      const tagId = Number(tagDetail[1]);
+      const entry = [...tags.values()].find((tag) => tag.id === tagId);
+      if (!entry) return json(response, 404, { error: 'not found' });
+      if (request.method === 'GET') return json(response, 200, entry);
+      if (request.method === 'PATCH') {
+        const patch = await readBody(request);
+        const updated = { ...entry, ...patch };
+        tags.delete(entry.name);
+        tags.set(updated.name, updated);
+        return json(response, 200, updated);
+      }
+      if (request.method === 'DELETE') {
+        tags.delete(entry.name);
+        response.writeHead(204);
+        return response.end();
+      }
+    }
     const resource = url.pathname === '/api/custom_fields/' ? customFields : url.pathname === '/api/tags/' ? tags : null;
     if (resource && request.method === 'GET') {
-      const found = resource.get(url.searchParams.get('name__iexact'));
-      return json(response, 200, { results: found ? [found] : [] });
+      const exact = url.searchParams.get('name__iexact');
+      const contains = url.searchParams.get('name__icontains')?.toLowerCase();
+      const results = exact
+        ? [resource.get(exact)].filter(Boolean)
+        : [...resource.values()].filter((entry) => !contains || entry.name.toLowerCase().includes(contains));
+      return json(response, 200, { count: results.length, results });
     }
     if (resource && request.method === 'POST') {
       const body = await readBody(request);
-      const created = { id: nextResourceId++, name: body.name };
+      const created = { id: nextResourceId++, name: body.name, color: body.color || '#ffffff', text_color: body.text_color || '#000000', document_count: 0 };
       resource.set(body.name, created);
       return json(response, 201, created);
     }
@@ -101,6 +124,31 @@ test('action sync retries local writes, isolates member credentials, and redacts
     assert.deepEqual(audited.before, { title: 'Original title' });
     assert.deepEqual(audited.after, { title: 'Final title' });
     assert.equal(JSON.stringify(audited).includes('private OCR'), false);
+    const createdTag = await sync.createPaperlessTag(workspace.id, workspace.member_id, {
+      name: 'Needs review',
+      color: '#193c2c',
+      textColor: '#ffffff'
+    });
+    assert.equal(createdTag.tag.name, 'Needs review');
+    const listedTags = await sync.listPaperlessTags(workspace.id, workspace.member_id, 'review', 20);
+    assert.equal(listedTags.some((item) => item.name === 'Needs review'), true);
+    const updatedTag = await sync.updatePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id, {
+      name: 'Reviewed'
+    });
+    assert.equal(updatedTag.after.name, 'Reviewed');
+    await assert.rejects(
+      () => sync.deletePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id, {
+        name: 'Needs review',
+        documentCount: 0
+      }),
+      /Tag changed after approval/
+    );
+    assert.equal(tags.has('Reviewed'), true);
+    const deletedTag = await sync.deletePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id, {
+      name: 'Reviewed',
+      documentCount: 0
+    });
+    assert.equal(deletedTag.deleted.name, 'Reviewed');
     await documentModel.closeDatabase();
   } finally {
     await new Promise((resolve) => server.close(resolve));

@@ -9,6 +9,52 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: '3.2.0',
+    date: '26 July 2026',
+    title: 'Paper & Pine workspace',
+    summary: 'One calmer Tagvico interface, an inspectable research workspace and a clearer path from documents to safe action.',
+    status: 'released',
+    groups: [
+      {
+        title: 'One coherent product',
+        items: [
+          'The app and public landing page now share the light Paper & Pine system: warm paper surfaces, pine navigation, restrained lime accents and calmer information density.',
+          'Home, Documents, Ask Tagvico, Organize tags, Activity and Settings replace internal workflow names in the primary navigation.',
+          'Home is now the configured-install entry point, while Documents provides a direct route into processed-document search, detail, rescan and restore.',
+          'Document tags, provider controls, model rows and secondary copy use stronger contrast, while Home, Documents, Activity and live catalogs load through page-shaped skeletons.'
+        ]
+      },
+      {
+        title: 'Ask Tagvico',
+        items: [
+          'Conversations, answers and the live research trail now form one three-column workspace.',
+          'Paperless searches, reads, safe source metadata and result counts stay visible as the selected model works.',
+          'Document and tag reads run immediately, while every document or tag mutation becomes a durable approval card before Paperless can change.',
+          'Document approvals show the proposed values, and tag deletion stops if the approved name or linked-document count changed.',
+          'The model picker groups live models inside collapsible configured providers and shows only reasoning levels supported by the selected model.',
+          'Saved reasoning levels remain synchronized and are applied to GitHub Copilot, Ollama discovery has one bounded deadline, and explicit document shortcuts never leak internal non-document citation markers.',
+          'Read and inspection requests open bounded search results, accidental substring matches stay inert, and conversations remain reachable from the mobile drawer.'
+        ]
+      },
+      {
+        title: 'Tag organization and Settings',
+        items: [
+          'Duplicate cleanup now has a dedicated Organize tags workspace with a clear Analyze, Review, Move and Delete sequence.',
+          'Every many-to-one proposal shows the source, target, affected documents, confidence and model before approval.',
+          'Settings keeps configuration separate from operational cleanup and uses the same field, status and section hierarchy throughout.',
+          'Owner-only tag organization is hidden from adult and viewer navigation.'
+        ]
+      },
+      {
+        title: 'Landing and upgrade',
+        items: [
+          'The public site now explains the real workflows, provider boundary, privacy model, FAQ and pinned Docker install without a separate marketing theme.',
+          'Version 3.2 remains on the v3 data and documentation line. There is no v4 migration and no beta-theme toggle.'
+        ]
+      }
+    ]
+  },
+  {
     version: '3.1.2',
     date: '24 July 2026',
     title: 'Chat-only model catalogs',
@@ -103,4 +149,4 @@ export const changelogEntries: ChangelogEntry[] = [
   }
 ];
 
-export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.1.2')!;
+export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.0')!;

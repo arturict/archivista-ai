@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, RefreshCw, Search, X } from 'lucide-react';
+import { Brain, Check, ChevronDown, ChevronRight, RefreshCw, Search, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { ProviderIcon } from '@/components/provider-icon';
 import type {
@@ -20,6 +20,7 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [expandedProviders, setExpandedProviders] = useState<string[]>([]);
 
   const load = async (refresh = false) => {
     setLoading(true);
@@ -36,6 +37,8 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
         defaultSelection: body.defaultSelection || null
       });
       setSelection(body.selection || body.defaultSelection || null);
+      const selected = body.selection || body.defaultSelection || null;
+      if (selected?.providerInstanceId) setExpandedProviders([selected.providerInstanceId]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load configured models');
     } finally {
@@ -61,6 +64,10 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
         || `${provider.name} ${model.name} ${model.id}`.toLocaleLowerCase().includes(normalizedQuery))
     }))
     .filter((provider) => provider.models.length), [catalog.providers, normalizedQuery]);
+  const reasoningOption = selectedModel?.options.find(
+    (option): option is Extract<typeof option, { type: 'select' }> =>
+      option.id === 'reasoningEffort' && option.type === 'select'
+  );
 
   const choose = async (next: CompanionModelSelection) => {
     setSaving(true);
@@ -76,7 +83,8 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
       const persisted = body.selection || next;
       setSelection({
         providerInstanceId: persisted.providerInstanceId,
-        modelId: persisted.modelId
+        modelId: persisted.modelId,
+        ...(persisted.reasoningEffort ? { reasoningEffort: persisted.reasoningEffort } : {})
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not select this model');
@@ -85,9 +93,25 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const setReasoningEffort = (reasoningEffort: string) => {
+    if (!selection) return;
+    void choose({ ...selection, reasoningEffort });
+  };
+
+  const toggleProvider = (instanceId: string) => {
+    setExpandedProviders((current) => current.includes(instanceId)
+      ? current.filter((candidate) => candidate !== instanceId)
+      : [...current, instanceId]);
+  };
+
   return <div className="companion-model-control">
     <Dialog.Root onOpenChange={(open) => {
       if (!open) setQuery('');
+      if (open && selection?.providerInstanceId) {
+        setExpandedProviders((current) => current.includes(selection.providerInstanceId)
+          ? current
+          : [...current, selection.providerInstanceId]);
+      }
     }}>
       <Dialog.Trigger asChild>
         <button
@@ -140,18 +164,39 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
             </button>
           </div>
           <div className="companion-model-list">
-            {visibleProviders.map((provider) => <section key={provider.instanceId}>
-              <h3><ProviderIcon icon={provider.icon} name={provider.name} />{provider.name}</h3>
-              {provider.models.map((model) => {
+            {loading ? <div className="model-catalog-skeleton" aria-label="Loading configured models">
+              {Array.from({ length: 5 }, (_, index) => <span key={index}><i /><b /><small /></span>)}
+            </div> : null}
+            {!loading && visibleProviders.map((provider) => {
+              const expanded = Boolean(normalizedQuery) || expandedProviders.includes(provider.instanceId);
+              return <section className={`companion-provider-group${expanded ? ' is-expanded' : ''}`} key={provider.instanceId}>
+              <button
+                type="button"
+                className="companion-provider-toggle"
+                onClick={() => toggleProvider(provider.instanceId)}
+                aria-expanded={expanded}
+              >
+                <ProviderIcon icon={provider.icon} name={provider.name} />
+                <span><strong>{provider.name}</strong><small>{provider.models.length} live model{provider.models.length === 1 ? '' : 's'}</small></span>
+                {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+              </button>
+              {expanded ? <div className="companion-provider-models">{provider.models.map((model) => {
                 const selected = selection?.providerInstanceId === provider.instanceId
                   && selection.modelId === model.id;
+                const modelReasoning = model.options.find(
+                  (option) => option.id === 'reasoningEffort' && option.type === 'select'
+                );
+                const defaultReasoning = modelReasoning?.type === 'select'
+                  ? modelReasoning.defaultValue || modelReasoning.values[0]?.id
+                  : undefined;
                 return <Dialog.Close asChild key={model.id}>
                   <button
                     type="button"
                     className={selected ? 'is-selected' : undefined}
                     onClick={() => void choose({
                       providerInstanceId: provider.instanceId,
-                      modelId: model.id
+                      modelId: model.id,
+                      ...(defaultReasoning ? { reasoningEffort: defaultReasoning } : {})
                     })}
                   >
                     <span>
@@ -159,14 +204,18 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
                       <small>{model.id}</small>
                       <span className="settings-capabilities">
                         {model.isDefault ? <span>Provider default</span> : null}
+                        {model.capabilities.includes('tools') ? <span>Tools</span> : null}
+                        {model.capabilities.includes('vision') ? <span>Vision</span> : null}
+                        {model.capabilities.includes('thinking') ? <span>Thinking</span> : null}
                         {model.options.map((option) => <span key={option.id}>{option.label}</span>)}
                       </span>
                     </span>
                     {selected ? <Check aria-label="Selected" /> : null}
                   </button>
                 </Dialog.Close>;
-              })}
-            </section>)}
+              })}</div> : null}
+            </section>;
+            })}
             {!loading && !visibleProviders.length ? <div className="settings-model-empty">
               {normalizedQuery
                 ? 'No configured model matches your search.'
@@ -176,6 +225,18 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+    {reasoningOption ? <label className="companion-reasoning-control">
+      <Brain aria-hidden="true" />
+      <span className="sr-only">Thinking effort</span>
+      <select
+        value={selection?.reasoningEffort || reasoningOption.defaultValue || reasoningOption.values[0]?.id || ''}
+        disabled={saving}
+        onChange={(event) => setReasoningEffort(event.target.value)}
+        title="Thinking effort"
+      >
+        {reasoningOption.values.map((value) => <option key={value.id} value={value.id}>{value.label}</option>)}
+      </select>
+    </label> : null}
     {error ? <span className="companion-model-error" role="status">{error}</span> : null}
   </div>;
 }

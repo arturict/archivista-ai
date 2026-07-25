@@ -37,6 +37,7 @@ export const modelDescriptorSchema = z.object({
   name: z.string().min(1),
   isDefault: z.boolean().default(false),
   options: z.array(providerOptionDescriptorSchema).default([]),
+  capabilities: z.array(z.string().trim().min(1).max(80)).default([]),
   contextWindow: z.number().int().positive().nullable().optional()
 });
 

@@ -2,6 +2,8 @@ FROM nginx:1.27-alpine
 
 COPY docs/index.html /usr/share/nginx/html/index.html
 COPY docs/favicon.ico /usr/share/nginx/html/favicon.ico
+COPY docs/tagvico-icon.png /usr/share/nginx/html/tagvico-icon.png
+COPY docs/provider-icons /usr/share/nginx/html/provider-icons
 
 RUN printf '%s\n' \
   'server {' \

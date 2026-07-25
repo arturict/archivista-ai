@@ -1,6 +1,42 @@
 # Release notes
 
-## v3.1.2 — current stable
+## v3.2.0
+
+Released 26 July 2026.
+
+Tagvico 3.2 replaces the previous dark application and marketing surfaces with
+one light **Paper & Pine** interface. The main navigation now follows concrete
+jobs: Home, Documents, Ask Tagvico, Organize tags, Activity, and Settings.
+
+Ask Tagvico is now a three-column research workspace. Conversations remain on
+the left, the answer and configured-model composer stay in the centre, and a
+live research trail shows every safe Paperless search, document read, source
+count, and pending approval on the right.
+
+Read tools can inspect documents and tags immediately. Document and tag
+creates, edits and deletions remain inert until an owner or adult approves the
+durable proposal. The configured-model picker is grouped by collapsible
+provider and exposes model-specific reasoning levels.
+
+Content requests such as read, inspect, open, and review now read the bounded
+Paperless matches. GitHub Copilot receives the saved reasoning level, accidental
+substring matches no longer start research, and conversations remain reachable
+from a dedicated drawer on narrow screens.
+
+Duplicate-tag cleanup has its own review workspace. Analysis is read-only, each
+many-to-one mapping shows its document impact, and moving references remains a
+separate operation from deleting the unused source.
+
+Document chips, provider controls and model metadata now meet the light
+interface's contrast targets. Home, Documents, Activity and live model catalogs
+show their actual structure as skeletons while data is loading.
+
+Upgrade by backing up `tagvico_ai_data`, pinning
+`ghcr.io/arturict/tagvico-ai:3.2.0`, and recreating only the Tagvico container.
+This remains a v3 upgrade. There is no v4 migration and no parallel beta-theme
+preference.
+
+## v3.1.2
 
 Released 24 July 2026.
 

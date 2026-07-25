@@ -15,7 +15,10 @@ export function resolveRuntimeModel(selection?: CompanionModelSelection | null):
       kind: 'text-adapter',
       provider: 'codex',
       modelId: selected.model,
-      generateText: (prompt, signal) => codexService.generateText(prompt, signal, { model: selected.model })
+      generateText: (prompt, signal) => codexService.generateText(prompt, signal, {
+        model: selected.model,
+        reasoningEffort: selection?.reasoningEffort
+      })
     };
   }
   if (selected.provider === 'copilot') {
@@ -23,7 +26,10 @@ export function resolveRuntimeModel(selection?: CompanionModelSelection | null):
       kind: 'text-adapter',
       provider: 'copilot',
       modelId: selected.model,
-      generateText: (prompt) => copilotService.generateText(prompt, { model: selected.model })
+      generateText: (prompt) => copilotService.generateText(prompt, {
+        model: selected.model,
+        reasoningEffort: selection?.reasoningEffort
+      })
     };
   }
   if (!selected.apiKey && selected.provider !== 'ollama') {

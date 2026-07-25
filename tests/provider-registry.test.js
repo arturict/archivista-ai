@@ -91,7 +91,12 @@ test('all eight provider discovery adapters normalize a live catalog', async () 
   global.fetch = async (url) => new Response(
     String(url).endsWith('/api/tags')
       ? JSON.stringify({ models: [{ name: 'local-model' }] })
-      : JSON.stringify({ data: [{ id: 'live-model', name: 'Live model' }] }),
+      : String(url).endsWith('/api/show')
+        ? JSON.stringify({
+            capabilities: ['completion', 'tools'],
+            model_info: { 'local.context_length': 32768 }
+          })
+        : JSON.stringify({ data: [{ id: 'live-model', name: 'Live model' }] }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
   codexAuth.models = async () => [{
@@ -127,4 +132,58 @@ test('all eight provider discovery adapters normalize a live catalog', async () 
     codexAuth.models = originalCodexModels;
     copilot.status = originalCopilotStatus;
   }
+});
+
+test('Ollama discovery reads live capabilities without inventing them when show fails', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async (url, init) => {
+    if (String(url).endsWith('/api/tags')) {
+      return new Response(JSON.stringify({
+        models: [{ name: 'gemma4:e2b' }, { name: 'legacy-local:latest' }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    const requested = JSON.parse(String(init?.body || '{}')).model;
+    if (requested === 'legacy-local:latest') {
+      return new Response('not supported', { status: 404 });
+    }
+    return new Response(JSON.stringify({
+      capabilities: ['completion', 'tools', 'vision', 'thinking'],
+      model_info: { 'gemma4.context_length': 131072 }
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const models = await registry.discoverOllamaModels(
+      registry.getProviderDefinition('ollama'),
+      { OLLAMA_API_URL: 'http://provider.test' }
+    );
+    assert.deepEqual(models, [
+      {
+        id: 'gemma4:e2b',
+        name: 'gemma4:e2b',
+        isDefault: false,
+        options: [],
+        capabilities: ['completion', 'tools', 'vision', 'thinking'],
+        contextWindow: 131072
+      },
+      {
+        id: 'legacy-local:latest',
+        name: 'legacy-local:latest',
+        isDefault: false,
+        options: [],
+        capabilities: []
+      }
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('Ollama discovery shares one deadline across catalog detail requests', () => {
+  const source = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'services', 'providerRegistry.ts'),
+    'utf8'
+  );
+  assert.match(source, /const discoverySignal = AbortSignal\.timeout\(10_000\)/);
+  assert.match(source, /fetchJson\(`\$\{baseUrl\}\/api\/tags`, authHeaders, \{ signal: discoverySignal \}\)/);
+  assert.match(source, /body: JSON\.stringify\(\{ model: model\.id, verbose: false \}\),\s*signal: discoverySignal/);
 });

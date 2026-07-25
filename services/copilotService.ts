@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-import type { AssistantUsageData, CopilotClient, CopilotSession, ModelInfo } from '@github/copilot-sdk';
+import type {
+  AssistantUsageData,
+  CopilotClient,
+  CopilotSession,
+  ModelInfo
+} from '@github/copilot-sdk';
 
 const config = require('../config/config');
 const confidenceGuard = require('./confidenceGuard');
@@ -11,6 +16,7 @@ const path = require('path');
 
 type CopilotOverrides = { home?: string; gitHubToken?: string };
 type CopilotRuntime = { client: CopilotClient; workingDirectory: string };
+type CopilotReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
 function presentModels(models: ModelInfo[]) {
   return models
@@ -155,7 +161,7 @@ class CopilotService {
 
   reset() {}
 
-  async generateText(prompt: string, options: { model?: string } = {}) {
+  async generateText(prompt: string, options: { model?: string; reasoningEffort?: string } = {}) {
     let client: CopilotClient | undefined;
     let session: CopilotSession | undefined;
     let workingDirectory: string | undefined;
@@ -165,6 +171,9 @@ class CopilotService {
       ({ client, workingDirectory } = await this.createClient());
       session = await client.createSession({
         model,
+        ...(options.reasoningEffort
+          ? { reasoningEffort: options.reasoningEffort as CopilotReasoningEffort }
+          : {}),
         availableTools: [],
         excludedTools: ['builtin:*', 'mcp:*', 'custom:*'],
         onPermissionRequest: () => ({ kind: 'reject', feedback: 'Tagvico Telegram chat never permits tools.' })

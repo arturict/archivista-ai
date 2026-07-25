@@ -159,11 +159,13 @@ function revisionFor(env: Environment): string {
 async function environment(): Promise<{ persisted: Environment; effective: Environment }> {
   const persisted = (await setupService.loadConfig()) || {};
   const effective = { ...persisted };
-  // Match dotenv/config semantics: values injected by Docker or the host win
-  // over the persisted .env file. Values that dotenv itself loaded are not
-  // considered externally managed.
+  // Non-empty values injected by Docker or the host win over the persisted
+  // .env file. Compose often expands optional variables to an empty string;
+  // those placeholders must not disable credentials saved through Settings.
+  // Values that dotenv itself loaded are not considered externally managed.
   for (const key of externallyManagedEnvironmentKeys) {
-    if (process.env[key] !== undefined) effective[key] = process.env[key];
+    const injectedValue = String(process.env[key] ?? '').trim();
+    if (injectedValue) effective[key] = injectedValue;
   }
   applyPersistedAiSelection(effective, persisted);
   return {
@@ -321,7 +323,7 @@ async function getSettings() {
       customFields: customFields(effective.CUSTOM_FIELDS)
     },
     diagnostics: {
-      version: effective.TAGVICO_AI_VERSION || '3.1.2',
+      version: effective.TAGVICO_AI_VERSION || '3.2.0',
       configured: yes(effective.TAGVICO_AI_INITIAL_SETUP),
       providerRegistrySize: knownDefinitions.length
     }

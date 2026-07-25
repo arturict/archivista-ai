@@ -53,6 +53,47 @@ test('Companion rejects stale or invented models and falls back to a runtime def
   });
 });
 
+test('Companion validates per-model reasoning and removes invalid document tool markers', () => {
+  const catalog = {
+    providers: [{
+      instanceId: 'codex',
+      name: 'ChatGPT subscription',
+      models: [{
+        id: 'gpt-5.6-terra',
+        name: 'Terra',
+        isDefault: true,
+        capabilities: ['tools', 'thinking'],
+        options: [{
+          id: 'reasoningEffort',
+          label: 'Thinking effort',
+          type: 'select',
+          defaultValue: 'medium',
+          values: [{ id: 'low', label: 'Low' }, { id: 'medium', label: 'Medium' }]
+        }]
+      }]
+    }],
+    defaultSelection: { providerInstanceId: 'codex', modelId: 'gpt-5.6-terra' }
+  };
+  assert.equal(modelService.selectionIsAvailable(catalog, {
+    providerInstanceId: 'codex',
+    modelId: 'gpt-5.6-terra',
+    reasoningEffort: 'medium'
+  }), true);
+  assert.equal(modelService.selectionIsAvailable(catalog, {
+    providerInstanceId: 'codex',
+    modelId: 'gpt-5.6-terra',
+    reasoningEffort: 'invented'
+  }), false);
+  assert.equal(
+    companion.sanitizeCompanionText('24 documents. [doc:count_documents]'),
+    '24 documents.'
+  );
+  assert.equal(
+    companion.sanitizeCompanionText('Read [doc:42] before renewing.'),
+    'Read [doc:42] before renewing.'
+  );
+});
+
 test('Companion excludes live catalog entries that cannot answer chat requests', () => {
   for (const id of [
     'text-embedding-3-small',
@@ -67,11 +108,23 @@ test('Companion excludes live catalog entries that cannot answer chat requests',
     'gpt-realtime-2',
     'sora-2'
   ]) {
-    assert.equal(modelService.supportsCompanionModel({ id }), false, id);
+    assert.equal(modelService.supportsCompanionModel({ id, capabilities: [] }), false, id);
   }
   for (const id of ['gpt-5.6-terra', 'claude-sonnet-4.6', 'gemma3:latest', 'gpt-4o-search-preview']) {
-    assert.equal(modelService.supportsCompanionModel({ id }), true, id);
+    assert.equal(modelService.supportsCompanionModel({ id, capabilities: [] }), true, id);
   }
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'gemma4:e2b',
+    capabilities: ['completion', 'tools', 'vision']
+  }, 'ollama'), true);
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'gemma3:4b',
+    capabilities: ['completion', 'vision']
+  }, 'ollama'), false);
+  assert.equal(modelService.supportsCompanionModel({
+    id: 'unknown-local-model',
+    capabilities: []
+  }, 'ollama'), false);
 });
 
 test('retired and unsupported provider definitions are never exposed as verified Companion runtimes', () => {
@@ -138,6 +191,10 @@ test('tool presentation exposes safe research metadata but strips OCR, proposal 
 });
 
 test('subscription adapters only research clear Paperless intents', () => {
+  assert.equal(research.shouldPlanAdapterResearch('Tell me what Tagvico can do'), false);
+  assert.equal(research.shouldPlanAdapterResearch('Is this actionable?'), false);
+  assert.equal(research.shouldPlanAdapterResearch('Show my Paperless tags'), true);
+  assert.equal(research.shouldReadCompanionSearchResults('Read my document about Alpenstrom cancellation terms'), true);
   assert.deepEqual(research.planCompanionResearch('hey'), {
     steps: [],
     readSearchResults: false
@@ -146,6 +203,36 @@ test('subscription adapters only research clear Paperless intents', () => {
     steps: [{ toolName: 'count_documents', input: {} }],
     readSearchResults: false
   });
+  assert.deepEqual(research.planCompanionResearch('doc://countdocuments'), {
+    steps: [{ toolName: 'count_documents', input: {} }],
+    readSearchResults: false
+  });
+  assert.deepEqual(
+    research.planCompanionResearch('Create a Paperless tag named Codex QA Temporary'),
+    {
+      steps: [{
+        toolName: 'propose_tag_create',
+        input: {
+          name: 'Codex QA Temporary',
+          reason: 'Create the Paperless tag "Codex QA Temporary" as requested.'
+        }
+      }],
+      readSearchResults: false
+    }
+  );
+  assert.equal(research.explicitCompanionTagCreate('Create a tag named Taxes.'), 'Taxes');
+  assert.equal(research.explicitCompanionTagCreate('Create a tag named "Taxes".'), 'Taxes');
+  assert.equal(research.explicitCompanionTagCreate('Erstelle einen Tag namens Steuern!'), 'Steuern');
+  assert.equal(
+    research.directCompanionResearchAnswer('doc://countdocuments', [
+      { toolName: 'count_documents', output: { count: 24 } }
+    ]),
+    'Your Paperless library contains 24 documents in total.'
+  );
+  assert.equal(
+    research.directCompanionResearchAnswer('doc://countdocuments', []),
+    null
+  );
   assert.deepEqual(research.planCompanionResearch('Show my newest documents'), {
     steps: [{ toolName: 'list_recent_documents', input: { limit: 8 } }],
     readSearchResults: false
@@ -191,6 +278,7 @@ test('Companion UI renders safe tool traces without dumping raw model objects', 
   assert.match(source, /companionToolActivity\(/);
   assert.doesNotMatch(source, /JSON\.stringify\(part\.(input|output)/);
   assert.doesNotMatch(source, /<pre[^>]*>\s*\{part\.(input|output)/);
+  assert.match(source, /Object\.entries\(patch\)\.map\(\(\[key, value\]\) => `\$\{key\}: \$\{approvalValue\(value\)\}`\)/);
 });
 
 test('Companion message scrolling never returns a value as an effect cleanup', () => {
@@ -205,6 +293,33 @@ test('navigation hides Review immediately in automatic write mode', () => {
   assert.match(source, /href !== '\/review' \|\| writeMode === 'review'/);
   assert.match(source, /tagvico:write-mode/);
   assert.match(settings, /new CustomEvent\('tagvico:write-mode'/);
+});
+
+test('owner-only workspaces stay out of navigation for other household roles', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'app-navigation-shell.tsx'), 'utf8');
+  const layout = fs.readFileSync(path.join(__dirname, '..', 'src', 'app', '(app)', 'layout.tsx'), 'utf8');
+  assert.match(source, /href !== '\/tags' \|\| workspaceRole === 'owner'/);
+  assert.match(layout, /workspaceRole=\{workspace\.role\}/);
+});
+
+test('model picker keeps the reasoning effort returned by the server', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'companion-model-picker.tsx'), 'utf8');
+  assert.match(source, /persisted\.reasoningEffort \? \{ reasoningEffort: persisted\.reasoningEffort \}/);
+});
+
+test('Copilot runtime applies persisted model reasoning selections', () => {
+  const runtime = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'server', 'agent', 'model-runtime.ts'), 'utf8');
+  const service = fs.readFileSync(path.join(__dirname, '..', 'services', 'copilotService.ts'), 'utf8');
+  assert.match(runtime, /copilotService\.generateText\(prompt,\s*\{[\s\S]*reasoningEffort: selection\?\.reasoningEffort/);
+  assert.match(service, /reasoningEffort: options\.reasoningEffort as CopilotReasoningEffort/);
+});
+
+test('mobile Companion keeps chat and conversation controls reachable', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'companion.tsx'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'app', 'globals.css'), 'utf8');
+  assert.match(source, /className="companion-sessions-mobile-toggle companion-icon-button"/);
+  assert.match(css, /\.companion-studio\.has-inspector\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(css, /\.companion-sidebar\.is-sessions-open\s*\{[\s\S]*?display:\s*grid/);
 });
 
 test('provider model lists have their own bounded scrolling surfaces', () => {

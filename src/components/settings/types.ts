@@ -20,6 +20,7 @@ export type ModelDescriptor = {
   name: string;
   isDefault: boolean;
   options: ProviderOptionDescriptor[];
+  capabilities: string[];
   contextWindow?: number | null;
 };
 

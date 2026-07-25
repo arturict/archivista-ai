@@ -294,7 +294,9 @@ function normalizeReasoningOptions(
   }];
 }
 
-function normalizeModels(models: ModelDescriptor[]): ModelDescriptor[] {
+function normalizeModels(
+  models: Array<Omit<ModelDescriptor, 'capabilities'> & { capabilities?: string[] }>
+): ModelDescriptor[] {
   const unique = new Map<string, ModelDescriptor>();
   for (const model of models) {
     const id = String(model.id || '').trim();
@@ -304,6 +306,9 @@ function normalizeModels(models: ModelDescriptor[]): ModelDescriptor[] {
       name: String(model.name || id).trim() || id,
       isDefault: Boolean(model.isDefault),
       options: Array.isArray(model.options) ? model.options : [],
+      capabilities: Array.isArray(model.capabilities)
+        ? [...new Set(model.capabilities.map((capability) => String(capability).trim().toLowerCase()).filter(Boolean))]
+        : [],
       ...(model.contextWindow ? { contextWindow: model.contextWindow } : {})
     });
   }
@@ -329,10 +334,16 @@ function secretFor(definition: ProviderDefinition, env: Environment): string {
   return field ? environmentValue(env, field.environmentKey, field.legacyEnvironmentKeys) : '';
 }
 
-async function fetchJson(url: string, headers: Record<string, string>): Promise<unknown> {
+async function fetchJson(
+  url: string,
+  headers: Record<string, string>,
+  init: { method?: string; body?: string; signal?: AbortSignal } = {}
+): Promise<unknown> {
+  const { signal, ...requestInit } = init;
   const response = await fetch(url, {
+    ...requestInit,
     headers,
-    signal: AbortSignal.timeout(10_000),
+    signal: signal || AbortSignal.timeout(10_000),
     cache: 'no-store'
   });
   if (!response.ok) {
@@ -367,15 +378,54 @@ async function discoverOpenAIModels(definition: ProviderDefinition, env: Environ
 async function discoverOllamaModels(definition: ProviderDefinition, env: Environment): Promise<ModelDescriptor[]> {
   const baseUrl = baseUrlFor(definition, env);
   const apiKey = secretFor(definition, env);
-  const payload = await fetchJson(`${baseUrl}/api/tags`, apiKey ? { Authorization: `Bearer ${apiKey}` } : {});
+  const discoverySignal = AbortSignal.timeout(10_000);
+  const authHeaders: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {};
+  const payload = await fetchJson(`${baseUrl}/api/tags`, authHeaders, { signal: discoverySignal });
   const entries = payload && typeof payload === 'object' && Array.isArray((payload as { models?: unknown[] }).models)
     ? (payload as { models: unknown[] }).models
     : [];
-  return normalizeModels(entries.map((entry) => {
+  const candidates = entries.map((entry) => {
     const candidate = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
     const id = String(candidate.name || candidate.model || '');
-    return { id, name: id, isDefault: false, options: [] };
-  }));
+    return { id, name: id, isDefault: false, options: [], capabilities: [] };
+  }).filter((model) => model.id);
+
+  const detailed: ModelDescriptor[] = [];
+  for (let index = 0; index < candidates.length; index += 4) {
+    const batch = candidates.slice(index, index + 4);
+    detailed.push(...await Promise.all(batch.map(async (model) => {
+      try {
+        const details = await fetchJson(`${baseUrl}/api/show`, {
+          ...authHeaders,
+          'Content-Type': 'application/json'
+        }, {
+          method: 'POST',
+          body: JSON.stringify({ model: model.id, verbose: false }),
+          signal: discoverySignal
+        });
+        const source = details && typeof details === 'object'
+          ? details as { capabilities?: unknown[]; model_info?: Record<string, unknown> }
+          : {};
+        const capabilities = Array.isArray(source.capabilities)
+          ? source.capabilities.map((capability) => String(capability))
+          : [];
+        const contextWindow = Object.entries(source.model_info || {})
+          .find(([key, value]) => key.endsWith('.context_length') && Number(value) > 0)?.[1];
+        return {
+          ...model,
+          capabilities,
+          ...(Number(contextWindow) > 0 ? { contextWindow: Number(contextWindow) } : {})
+        };
+      } catch {
+        // Keep the model available for structured-output filing without
+        // claiming capabilities that the runtime did not verify.
+        return model;
+      }
+    })));
+  }
+  return normalizeModels(detailed);
 }
 
 function readProviderConfiguration(definition: ProviderDefinition, env: Environment) {
