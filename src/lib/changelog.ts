@@ -10,10 +10,10 @@ export type ChangelogEntry = {
 export const changelogEntries: ChangelogEntry[] = [
   {
     version: '3.2.0',
-    date: 'Coming soon',
+    date: '26 July 2026',
     title: 'Paper & Pine workspace',
     summary: 'One calmer Tagvico interface, an inspectable research workspace and a clearer path from documents to safe action.',
-    status: 'unreleased',
+    status: 'released',
     groups: [
       {
         title: 'One coherent product',
@@ -30,8 +30,9 @@ export const changelogEntries: ChangelogEntry[] = [
           'Conversations, answers and the live research trail now form one three-column workspace.',
           'Paperless searches, reads, safe source metadata and result counts stay visible as the selected model works.',
           'Document and tag reads run immediately, while every document or tag mutation becomes a durable approval card before Paperless can change.',
+          'Document approvals show the proposed values, and tag deletion stops if the approved name or linked-document count changed.',
           'The model picker groups live models inside collapsible configured providers and shows only reasoning levels supported by the selected model.',
-          'Explicit document shortcuts work without leaking internal non-document citation markers into the answer.'
+          'Saved reasoning levels remain synchronized, Ollama discovery has one bounded deadline, and explicit document shortcuts never leak internal non-document citation markers.'
         ]
       },
       {
@@ -39,7 +40,8 @@ export const changelogEntries: ChangelogEntry[] = [
         items: [
           'Duplicate cleanup now has a dedicated Organize tags workspace with a clear Analyze, Review, Move and Delete sequence.',
           'Every many-to-one proposal shows the source, target, affected documents, confidence and model before approval.',
-          'Settings keeps configuration separate from operational cleanup and uses the same field, status and section hierarchy throughout.'
+          'Settings keeps configuration separate from operational cleanup and uses the same field, status and section hierarchy throughout.',
+          'Owner-only tag organization is hidden from adult and viewer navigation.'
         ]
       },
       {

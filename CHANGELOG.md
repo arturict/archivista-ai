@@ -35,11 +35,17 @@
   an unexplained loading state.
 - Keep pending writes beside the research trail, with the existing exact
   approve/reject boundary and read-only default.
+- Show every proposed document field value inside its approval card, not only
+  the names of the fields that would change.
 - Let read tools count, search and read documents as well as list and inspect
   Paperless tags without an approval interruption. Document and tag creates,
   updates and deletions always become durable approval cards first.
+- Revalidate a tag's name and linked-document count immediately before an
+  approved deletion, and stop when the impact changed after approval.
 - Group the live model picker by collapsible configured provider, show provider
   icons, and expose only the reasoning efforts supported by the selected model.
+- Keep the selected reasoning effort in sync with the server response and bound
+  the complete Ollama capability-discovery pass to one ten-second deadline.
 - Accept explicit shortcuts such as `doc://countdocuments` and prevent internal
   non-document citation markers from leaking into answers.
 - Preserve durable new-chat, search, rename, guarded delete, stop, retry, copy
@@ -57,6 +63,8 @@
 - Keep Settings focused on configuration while linking to operational cleanup
   work, with clearer section hierarchy, buffered inputs and consistent inline
   status surfaces.
+- Hide the owner-only Organize tags workspace from adult and viewer navigation
+  instead of sending those roles to an API they cannot use.
 
 ### Landing page and documentation
 

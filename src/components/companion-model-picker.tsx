@@ -83,7 +83,8 @@ export function CompanionModelPicker({ sessionId }: { sessionId: string }) {
       const persisted = body.selection || next;
       setSelection({
         providerInstanceId: persisted.providerInstanceId,
-        modelId: persisted.modelId
+        modelId: persisted.modelId,
+        ...(persisted.reasoningEffort ? { reasoningEffort: persisted.reasoningEffort } : {})
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not select this model');

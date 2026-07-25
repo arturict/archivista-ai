@@ -52,6 +52,17 @@ type SessionSummary = {
   updated_at: string;
 };
 
+function approvalValue(value: unknown) {
+  if (value === null) return 'None';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return 'Unable to display';
+  }
+}
+
 function approvalCopy(approval: Approval) {
   const payload = approval.payload || {};
   const patch = payload.patch && typeof payload.patch === 'object'
@@ -86,7 +97,7 @@ function approvalCopy(approval: Approval) {
       title: `Update ${String(payload.documentTitle || `document #${payload.documentId}`)}`,
       meta: `Document #${String(payload.documentId || '')}`,
       details: [
-        `Fields: ${Object.keys(patch).join(', ')}`,
+        ...Object.entries(patch).map(([key, value]) => `${key}: ${approvalValue(value)}`),
         String(payload.reason || '')
       ].filter(Boolean)
     };

@@ -337,12 +337,13 @@ function secretFor(definition: ProviderDefinition, env: Environment): string {
 async function fetchJson(
   url: string,
   headers: Record<string, string>,
-  init: { method?: string; body?: string } = {}
+  init: { method?: string; body?: string; signal?: AbortSignal } = {}
 ): Promise<unknown> {
+  const { signal, ...requestInit } = init;
   const response = await fetch(url, {
-    ...init,
+    ...requestInit,
     headers,
-    signal: AbortSignal.timeout(10_000),
+    signal: signal || AbortSignal.timeout(10_000),
     cache: 'no-store'
   });
   if (!response.ok) {
@@ -377,10 +378,11 @@ async function discoverOpenAIModels(definition: ProviderDefinition, env: Environ
 async function discoverOllamaModels(definition: ProviderDefinition, env: Environment): Promise<ModelDescriptor[]> {
   const baseUrl = baseUrlFor(definition, env);
   const apiKey = secretFor(definition, env);
+  const discoverySignal = AbortSignal.timeout(10_000);
   const authHeaders: Record<string, string> = apiKey
     ? { Authorization: `Bearer ${apiKey}` }
     : {};
-  const payload = await fetchJson(`${baseUrl}/api/tags`, authHeaders);
+  const payload = await fetchJson(`${baseUrl}/api/tags`, authHeaders, { signal: discoverySignal });
   const entries = payload && typeof payload === 'object' && Array.isArray((payload as { models?: unknown[] }).models)
     ? (payload as { models: unknown[] }).models
     : [];
@@ -400,7 +402,8 @@ async function discoverOllamaModels(definition: ProviderDefinition, env: Environ
           'Content-Type': 'application/json'
         }, {
           method: 'POST',
-          body: JSON.stringify({ model: model.id, verbose: false })
+          body: JSON.stringify({ model: model.id, verbose: false }),
+          signal: discoverySignal
         });
         const source = details && typeof details === 'object'
           ? details as { capabilities?: unknown[]; model_info?: Record<string, unknown> }

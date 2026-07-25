@@ -271,6 +271,7 @@ test('Companion UI renders safe tool traces without dumping raw model objects', 
   assert.match(source, /companionToolActivity\(/);
   assert.doesNotMatch(source, /JSON\.stringify\(part\.(input|output)/);
   assert.doesNotMatch(source, /<pre[^>]*>\s*\{part\.(input|output)/);
+  assert.match(source, /Object\.entries\(patch\)\.map\(\(\[key, value\]\) => `\$\{key\}: \$\{approvalValue\(value\)\}`\)/);
 });
 
 test('Companion message scrolling never returns a value as an effect cleanup', () => {
@@ -285,6 +286,18 @@ test('navigation hides Review immediately in automatic write mode', () => {
   assert.match(source, /href !== '\/review' \|\| writeMode === 'review'/);
   assert.match(source, /tagvico:write-mode/);
   assert.match(settings, /new CustomEvent\('tagvico:write-mode'/);
+});
+
+test('owner-only workspaces stay out of navigation for other household roles', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'app-navigation-shell.tsx'), 'utf8');
+  const layout = fs.readFileSync(path.join(__dirname, '..', 'src', 'app', '(app)', 'layout.tsx'), 'utf8');
+  assert.match(source, /href !== '\/tags' \|\| workspaceRole === 'owner'/);
+  assert.match(layout, /workspaceRole=\{workspace\.role\}/);
+});
+
+test('model picker keeps the reasoning effort returned by the server', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'companion-model-picker.tsx'), 'utf8');
+  assert.match(source, /persisted\.reasoningEffort \? \{ reasoningEffort: persisted\.reasoningEffort \}/);
 });
 
 test('provider model lists have their own bounded scrolling surfaces', () => {

@@ -43,8 +43,16 @@ export async function executeApproval(householdId: string, approvalId: string, m
         break;
       }
       case 'paperless.tag.delete': {
-        const payload = approval.payload as { tagId: number };
-        result = await sync.deletePaperlessTag(householdId, memberId, payload.tagId);
+        const payload = approval.payload as { tagId: number; tagName?: string; documentCount?: number };
+        const expectedName = String(payload.tagName || '').trim();
+        const expectedDocumentCount = Number(payload.documentCount);
+        if (!expectedName || !Number.isSafeInteger(expectedDocumentCount) || expectedDocumentCount < 0) {
+          throw new Error('Tag deletion approval is missing its verified impact snapshot');
+        }
+        result = await sync.deletePaperlessTag(householdId, memberId, payload.tagId, {
+          name: expectedName,
+          documentCount: expectedDocumentCount
+        });
         break;
       }
       default:

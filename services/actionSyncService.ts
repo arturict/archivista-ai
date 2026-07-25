@@ -274,9 +274,23 @@ export async function updatePaperlessTag(
   return { ok: true, tagId, before, after };
 }
 
-export async function deletePaperlessTag(householdId: string, memberId: string | null, tagId: number) {
+export async function deletePaperlessTag(
+  householdId: string,
+  memberId: string | null,
+  tagId: number,
+  expected?: { name: string; documentCount: number }
+) {
   const client = clientFor(householdId, memberId);
   const before = await getPaperlessTag(householdId, memberId, tagId);
+  if (expected && (
+    before.name !== expected.name
+    || before.documentCount !== expected.documentCount
+  )) {
+    throw new Error(
+      `Tag changed after approval: expected “${expected.name}” with ${expected.documentCount} linked documents, `
+      + `found “${before.name}” with ${before.documentCount}. Review the deletion again.`
+    );
+  }
   await client.delete(`/tags/${tagId}/`);
   return { ok: true, tagId, deleted: before };
 }

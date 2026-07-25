@@ -136,7 +136,18 @@ test('action sync retries local writes, isolates member credentials, and redacts
       name: 'Reviewed'
     });
     assert.equal(updatedTag.after.name, 'Reviewed');
-    const deletedTag = await sync.deletePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id);
+    await assert.rejects(
+      () => sync.deletePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id, {
+        name: 'Needs review',
+        documentCount: 0
+      }),
+      /Tag changed after approval/
+    );
+    assert.equal(tags.has('Reviewed'), true);
+    const deletedTag = await sync.deletePaperlessTag(workspace.id, workspace.member_id, createdTag.tag.id, {
+      name: 'Reviewed',
+      documentCount: 0
+    });
     assert.equal(deletedTag.deleted.name, 'Reviewed');
     await documentModel.closeDatabase();
   } finally {

@@ -19,8 +19,8 @@ fields. The complete checklist and audit trail remain in Tagvico.
 ![Tagvico v3.2 Home dashboard in the Paper and Pine application shell](/screenshots/home-paper-pine-v3.png)
 
 This v3.2 capture comes from the representative release installation. It uses
-generic document metadata and exposes no document contents, account
-identifiers, credentials, or private endpoints.
+generic document metadata and synthetic workspace labels. It exposes no
+document contents, real account identifiers, credentials, or private endpoints.
 
 ## Household Companion and approvals
 
@@ -48,8 +48,9 @@ advertised by the selected model.
 
 ![Tagvico v3.2 Ask Tagvico workspace with persistent conversations, approval boundary, composer, configured model and visible research trail](/screenshots/companion-paper-pine-v3.png)
 
-The capture uses a generic greeting only. No document contents, private
-identifiers, credentials, or provider payloads are visible.
+The capture uses generic count queries and synthetic workspace labels to show
+the research trail. No document contents, real account identifiers,
+credentials, or provider payloads are visible.
 
 ## Operations at a glance
 
@@ -92,8 +93,9 @@ now-unused source tag.
 
 ![Tagvico v3.2 Organize tags workspace showing several source tags becoming one canonical target](/screenshots/tags-paper-pine-v3.png)
 
-The representative capture uses generic authentication tags. It contains no
-document content, private identifiers, credentials, or endpoints.
+The representative capture uses generic duplicate tags and synthetic workspace
+labels. It contains no document content, real account identifiers, credentials,
+or endpoints.
 
 ## Prompt control
 

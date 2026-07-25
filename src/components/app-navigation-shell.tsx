@@ -17,10 +17,11 @@ const links = [
   { href: '/settings', label: 'Settings', description: 'Connections, models and access', Icon: Settings }
 ] as const;
 
-export function AppNavigationShell({ children, workspaceName, userLabel, initialWriteMode }: {
+export function AppNavigationShell({ children, workspaceName, userLabel, workspaceRole, initialWriteMode }: {
   children: React.ReactNode;
   workspaceName: string;
   userLabel: string;
+  workspaceRole: string;
   initialWriteMode: 'review' | 'automatic';
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -75,7 +76,10 @@ export function AppNavigationShell({ children, workspaceName, userLabel, initial
         {collapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
       </button>
       <nav className="nav" aria-label="Main navigation">
-        {links.filter(({ href }) => href !== '/review' || writeMode === 'review').map(({ href, label, description, Icon }) => <div className="nav-entry" key={href}>
+        {links.filter(({ href }) =>
+          (href !== '/review' || writeMode === 'review')
+          && (href !== '/tags' || workspaceRole === 'owner')
+        ).map(({ href, label, description, Icon }) => <div className="nav-entry" key={href}>
           <Link href={href} className={pathname === href || pathname.startsWith(`${href}/`) ? 'is-active' : undefined} aria-current={pathname === href ? 'page' : undefined} title={collapsed ? `${label} — ${description}` : description}>
             <Icon className="nav-icon" aria-hidden="true" />
             <span className="nav-copy">{label}</span>

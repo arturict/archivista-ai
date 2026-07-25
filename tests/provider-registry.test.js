@@ -177,3 +177,13 @@ test('Ollama discovery reads live capabilities without inventing them when show 
     global.fetch = originalFetch;
   }
 });
+
+test('Ollama discovery shares one deadline across catalog detail requests', () => {
+  const source = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'services', 'providerRegistry.ts'),
+    'utf8'
+  );
+  assert.match(source, /const discoverySignal = AbortSignal\.timeout\(10_000\)/);
+  assert.match(source, /fetchJson\(`\$\{baseUrl\}\/api\/tags`, authHeaders, \{ signal: discoverySignal \}\)/);
+  assert.match(source, /body: JSON\.stringify\(\{ model: model\.id, verbose: false \}\),\s*signal: discoverySignal/);
+});
