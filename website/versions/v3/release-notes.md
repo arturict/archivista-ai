@@ -18,6 +18,11 @@ creates, edits and deletions remain inert until an owner or adult approves the
 durable proposal. The configured-model picker is grouped by collapsible
 provider and exposes model-specific reasoning levels.
 
+Content requests such as read, inspect, open, and review now read the bounded
+Paperless matches. GitHub Copilot receives the saved reasoning level, accidental
+substring matches no longer start research, and conversations remain reachable
+from a dedicated drawer on narrow screens.
+
 Duplicate-tag cleanup has its own review workspace. Analysis is read-only, each
 many-to-one mapping shows its document impact, and moving references remains a
 separate operation from deleting the unused source.

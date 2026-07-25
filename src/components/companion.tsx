@@ -480,6 +480,13 @@ export function Companion({
 
     <section className="companion-chat panel">
       <header className="companion-chat-head">
+        <button
+          type="button"
+          className="companion-sessions-mobile-toggle companion-icon-button"
+          onClick={() => setSessionsOpen(true)}
+          aria-label="Open conversations"
+          aria-expanded={sessionsOpen}
+        ><Menu aria-hidden="true" /></button>
         <div>
           <strong>{currentSession?.title || 'New conversation'}</strong>
           <small>{isWorking ? 'Working with your selected model…' : 'Ready to research your Paperless library'}</small>

@@ -1191,6 +1191,10 @@ label { display: grid; gap: 6px; color: var(--tv-muted); font-size: 13px; }
   padding: 11px 18px;
 }
 
+.companion-sessions-mobile-toggle {
+  display: none;
+}
+
 .companion-chat-head > div {
   min-width: 0;
   display: grid;
@@ -5332,12 +5336,27 @@ textarea {
     flex: 0 0 auto;
   }
 
-  .companion-studio {
+  .companion-studio,
+  .companion-studio.has-approvals,
+  .companion-studio.has-inspector {
     grid-template-columns: 1fr;
   }
 
   .companion-sidebar {
     display: none;
+  }
+
+  .companion-sidebar.is-sessions-open {
+    position: fixed;
+    z-index: 45;
+    inset: 20px;
+    width: min(360px, calc(100vw - 40px));
+    display: grid;
+    box-shadow: 0 24px 80px rgba(42, 54, 37, .24);
+  }
+
+  .companion-sessions-mobile-toggle {
+    display: grid;
   }
 }
 

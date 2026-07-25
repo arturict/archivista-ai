@@ -46,10 +46,19 @@
   icons, and expose only the reasoning efforts supported by the selected model.
 - Keep the selected reasoning effort in sync with the server response and bound
   the complete Ollama capability-discovery pass to one ten-second deadline.
+- Apply the selected reasoning effort to GitHub Copilot requests as well as the
+  other reasoning-capable runtimes.
+- Treat search, read, open, inspect and review requests as real document-content
+  intents while keeping unrelated words that merely contain `tagvico` or
+  `actionable` from triggering Paperless research.
 - Accept explicit shortcuts such as `doc://countdocuments` and prevent internal
   non-document citation markers from leaking into answers.
+- Strip conversational sentence punctuation from explicit tag-creation names
+  before presenting the approval.
 - Preserve durable new-chat, search, rename, guarded delete, stop, retry, copy
   and configured-provider model selection behavior in the redesigned shell.
+- Keep conversations and the research inspector reachable on narrow screens
+  through an explicit mobile drawer instead of collapsing the chat itself.
 
 ### Tag organization and Settings
 

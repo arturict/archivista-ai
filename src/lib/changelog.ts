@@ -32,7 +32,8 @@ export const changelogEntries: ChangelogEntry[] = [
           'Document and tag reads run immediately, while every document or tag mutation becomes a durable approval card before Paperless can change.',
           'Document approvals show the proposed values, and tag deletion stops if the approved name or linked-document count changed.',
           'The model picker groups live models inside collapsible configured providers and shows only reasoning levels supported by the selected model.',
-          'Saved reasoning levels remain synchronized, Ollama discovery has one bounded deadline, and explicit document shortcuts never leak internal non-document citation markers.'
+          'Saved reasoning levels remain synchronized and are applied to GitHub Copilot, Ollama discovery has one bounded deadline, and explicit document shortcuts never leak internal non-document citation markers.',
+          'Read and inspection requests open bounded search results, accidental substring matches stay inert, and conversations remain reachable from the mobile drawer.'
         ]
       },
       {

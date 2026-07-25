@@ -26,7 +26,10 @@ export function resolveRuntimeModel(selection?: CompanionModelSelection | null):
       kind: 'text-adapter',
       provider: 'copilot',
       modelId: selected.model,
-      generateText: (prompt) => copilotService.generateText(prompt, { model: selected.model })
+      generateText: (prompt) => copilotService.generateText(prompt, {
+        model: selected.model,
+        reasoningEffort: selection?.reasoningEffort
+      })
     };
   }
   if (!selected.apiKey && selected.provider !== 'ollama') {

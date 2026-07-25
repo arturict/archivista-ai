@@ -23,6 +23,8 @@ import type { AgentContext } from './types';
 import {
   directCompanionResearchAnswer,
   planCompanionResearch,
+  shouldPlanAdapterResearch,
+  shouldReadCompanionSearchResults,
   type CompanionResearchStep
 } from '../../../../services/companionResearchService';
 
@@ -358,7 +360,7 @@ export async function streamCompanion(
         const latestText = textOf(history.at(-1) as UIMessage).slice(0, 1_000);
         const fallbackPlan = planCompanionResearch(latestText);
         let plannedCalls: AdapterToolCall[] = [];
-        if (/(?:paperless|documents?|docs?|dokument|rechnung|invoice|actions?|tags?|doc:\/\/)/i.test(latestText)) {
+        if (shouldPlanAdapterResearch(latestText)) {
           try {
             plannedCalls = parseAdapterToolPlan(await model.generateText(
               adapterPlannerPrompt(history, latestText),
@@ -486,7 +488,7 @@ export async function streamCompanion(
               context.memberId,
               step.input.query
             ));
-            if (fallbackPlan.readSearchResults && Array.isArray(found)) {
+            if (shouldReadCompanionSearchResults(latestText) && Array.isArray(found)) {
               for (const result of found.slice(0, 3)) {
                 const documentId = Number(result && typeof result === 'object' ? (result as Record<string, unknown>).id : 0);
                 if (!Number.isSafeInteger(documentId) || documentId <= 0) continue;

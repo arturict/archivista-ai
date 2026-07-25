@@ -191,6 +191,10 @@ test('tool presentation exposes safe research metadata but strips OCR, proposal 
 });
 
 test('subscription adapters only research clear Paperless intents', () => {
+  assert.equal(research.shouldPlanAdapterResearch('Tell me what Tagvico can do'), false);
+  assert.equal(research.shouldPlanAdapterResearch('Is this actionable?'), false);
+  assert.equal(research.shouldPlanAdapterResearch('Show my Paperless tags'), true);
+  assert.equal(research.shouldReadCompanionSearchResults('Read my document about Alpenstrom cancellation terms'), true);
   assert.deepEqual(research.planCompanionResearch('hey'), {
     steps: [],
     readSearchResults: false
@@ -216,6 +220,9 @@ test('subscription adapters only research clear Paperless intents', () => {
       readSearchResults: false
     }
   );
+  assert.equal(research.explicitCompanionTagCreate('Create a tag named Taxes.'), 'Taxes');
+  assert.equal(research.explicitCompanionTagCreate('Create a tag named "Taxes".'), 'Taxes');
+  assert.equal(research.explicitCompanionTagCreate('Erstelle einen Tag namens Steuern!'), 'Steuern');
   assert.equal(
     research.directCompanionResearchAnswer('doc://countdocuments', [
       { toolName: 'count_documents', output: { count: 24 } }
@@ -298,6 +305,21 @@ test('owner-only workspaces stay out of navigation for other household roles', (
 test('model picker keeps the reasoning effort returned by the server', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'companion-model-picker.tsx'), 'utf8');
   assert.match(source, /persisted\.reasoningEffort \? \{ reasoningEffort: persisted\.reasoningEffort \}/);
+});
+
+test('Copilot runtime applies persisted model reasoning selections', () => {
+  const runtime = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'server', 'agent', 'model-runtime.ts'), 'utf8');
+  const service = fs.readFileSync(path.join(__dirname, '..', 'services', 'copilotService.ts'), 'utf8');
+  assert.match(runtime, /copilotService\.generateText\(prompt,\s*\{[\s\S]*reasoningEffort: selection\?\.reasoningEffort/);
+  assert.match(service, /reasoningEffort: options\.reasoningEffort as CopilotReasoningEffort/);
+});
+
+test('mobile Companion keeps chat and conversation controls reachable', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'components', 'companion.tsx'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'app', 'globals.css'), 'utf8');
+  assert.match(source, /className="companion-sessions-mobile-toggle companion-icon-button"/);
+  assert.match(css, /\.companion-studio\.has-inspector\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(css, /\.companion-sidebar\.is-sessions-open\s*\{[\s\S]*?display:\s*grid/);
 });
 
 test('provider model lists have their own bounded scrolling surfaces', () => {

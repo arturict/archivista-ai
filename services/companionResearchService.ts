@@ -22,10 +22,19 @@ type CompanionResearchResult = {
 const SOCIAL_ONLY = /^(?:hi|hey|hello|hallo|hoi|servus|moin|guten\s+(?:morgen|tag|abend)|danke|dankesch[oö]n|thanks|thank\s+you|was\s+kannst\s+du|what\s+can\s+you\s+do)[\s!.,?]*$/i;
 const DOCUMENT_WORDS = /(?:\b(?:document|documents|doc|docs|paperless|dokument|dokumente|rechnung|rechnungen|invoice|invoices|bill|bills|vertrag|vertr[aä]ge|contract|contracts|brief|letter|letters|notice|insurance|versicherung|receipt|beleg|steuer|tax)\b|doc:\/\/)/i;
 const SEARCH_WORDS = /\b(?:find|search|show|look\s+for|locate|suche|such|finde|zeig|zeige|durchsuche|welche|which)\b/i;
-const CONTENT_WORDS = /\b(?:summar|zusammenfass|due|deadline|f[aä]llig|frist|notice\s+period|k[üu]ndigungsfrist|amount|betrag|when|wann|what\s+does|was\s+steht|explain|erkl[aä]r)\w*/i;
+const CONTENT_WORDS = /\b(?:read|inspect|review|open|content|contents|terms|details|summar|zusammenfass|due|deadline|f[aä]llig|frist|notice\s+period|k[üu]ndigungsfrist|amount|betrag|when|wann|what\s+does|was\s+steht|explain|erkl[aä]r)\w*/i;
 const ACTION_WORDS = /\b(?:action|actions|task|tasks|to-?do|attention|obligation|deadline|deadlines|due\s+soon|aufgabe|aufgaben|aktion|aktionen|handlungsbedarf|pflicht|pflichten|frist|fristen|f[aä]llig)\b/i;
 const RECENT_WORDS = /\b(?:recent|latest|newest|new\s+documents?|last\s+documents?|recently\s+added|neueste|neuste|letzte|k[üu]rzlich|neue\s+dokumente)\b/i;
 const COUNT_WORDS = /(?:\bhow\s+many\b|\bcount\b|\bnumber\s+of\b|\bwie\s+viele\b|\banzahl\b|doc:\/\/count_?documents?)/i;
+const ADAPTER_PLANNING_WORDS = /(?:\b(?:paperless|documents?|docs?|dokumente?|rechnungen?|invoices?|actions?|tags?)\b|doc:\/\/)/i;
+
+export function shouldPlanAdapterResearch(text: string) {
+  return ADAPTER_PLANNING_WORDS.test(String(text || ''));
+}
+
+export function shouldReadCompanionSearchResults(text: string) {
+  return CONTENT_WORDS.test(String(text || ''));
+}
 
 export function explicitCompanionDocumentId(text: string) {
   const match = text.match(/(?:document|documents?|dokument|dokumente|doc)\s*#?\s*(\d{1,10})/i);
@@ -35,12 +44,15 @@ export function explicitCompanionDocumentId(text: string) {
 
 export function explicitCompanionTagCreate(text: string) {
   const source = String(text || '').trim();
-  const match = source.match(
-    /\b(?:create|add)\s+(?:a\s+)?(?:paperless(?:-ngx)?\s+)?tag\s+(?:named|called)\s+["“”']?(.+?)["“”']?\s*$/i
-  ) || source.match(
-    /\b(?:erstelle|erstell|füge)\s+(?:einen?\s+)?(?:paperless(?:-ngx)?\s+)?tag\s+(?:namens|mit\s+dem\s+namen)\s+["“”']?(.+?)["“”']?\s*$/i
-  );
-  const name = String(match?.[1] || '').trim().slice(0, 128);
+  const prefix = String.raw`(?:\b(?:create|add)\s+(?:a\s+)?(?:paperless(?:-ngx)?\s+)?tag\s+(?:named|called)|\b(?:erstelle|erstell|füge)\s+(?:einen?\s+)?(?:paperless(?:-ngx)?\s+)?tag\s+(?:namens|mit\s+dem\s+namen))`;
+  const quoted = source.match(new RegExp(`${prefix}\\s+["“']([^"”']{1,128})["”']\\s*[.!?]*$`, 'i'));
+  const unquoted = quoted ? null : source.match(new RegExp(`${prefix}\\s+(.+?)\\s*$`, 'i'));
+  const name = String(quoted?.[1] || unquoted?.[1] || '')
+    .trim()
+    .replace(/["'”]+$/, '')
+    .replace(/[.!?,;:]+$/, '')
+    .trim()
+    .slice(0, 128);
   return name || null;
 }
 
@@ -126,6 +138,6 @@ export function planCompanionResearch(text: string): CompanionResearchPlan {
 
   return {
     steps,
-    readSearchResults: shouldSearch && CONTENT_WORDS.test(normalized)
+    readSearchResults: shouldSearch && shouldReadCompanionSearchResults(normalized)
   };
 }
