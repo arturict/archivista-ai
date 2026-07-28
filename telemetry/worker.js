@@ -55,6 +55,16 @@ export default {
     if (request.method === 'POST' && url.pathname === '/v1/pageview') {
       const headers = websiteHeaders(request, env);
       if (!headers) return json({ error: 'origin_not_allowed' }, 403);
+      if (!env.PAGEVIEW_RATE_LIMITER?.limit) {
+        return json({ error: 'rate_limit_unavailable' }, 503, headers);
+      }
+      const rateLimit = await env.PAGEVIEW_RATE_LIMITER.limit({ key: 'landing-pageview' });
+      if (!rateLimit.success) {
+        return json({ error: 'rate_limited' }, 429, {
+          ...headers,
+          'retry-after': '60'
+        });
+      }
       await env.DB.prepare(`
         INSERT INTO landing_pageviews (day, views, received_at)
         VALUES (date('now'), 1, unixepoch())

@@ -8,6 +8,8 @@ const runtimeConfig = require('../config/config');
 const { normalizeProvider } = require('./providerCatalogService');
 
 type SetupConfig = Record<string, string>;
+const SETUP_VALIDATION_TIMEOUT_MS = 15_000;
+const SETUP_TOOL_NAME = 'confirm_tagvico_tool_support';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -17,6 +19,47 @@ function tokenLimitParam(model: string, value: number) {
   return /^gpt-5/i.test(model || '')
     ? { max_completion_tokens: value }
     : { max_tokens: value };
+}
+
+function toolValidationRequest(model: string) {
+  return {
+    model,
+    messages: [{
+      role: 'user' as const,
+      content: 'Call confirm_tagvico_tool_support with supported set to true.'
+    }],
+    tools: [{
+      type: 'function' as const,
+      function: {
+        name: SETUP_TOOL_NAME,
+        description: 'Confirms that the selected model can call tools required by Tagvico.',
+        parameters: {
+          type: 'object',
+          properties: { supported: { type: 'boolean' } },
+          required: ['supported'],
+          additionalProperties: false
+        }
+      }
+    }],
+    tool_choice: {
+      type: 'function' as const,
+      function: { name: SETUP_TOOL_NAME }
+    },
+    ...tokenLimitParam(model, 32)
+  };
+}
+
+function hasSetupToolCall(response: unknown): boolean {
+  const choices = (response as {
+    choices?: Array<{
+      message?: {
+        tool_calls?: Array<{ function?: { name?: string } }>;
+      };
+    }>;
+  } | null)?.choices;
+  return Boolean(choices?.some((choice) => choice.message?.tool_calls?.some(
+    (tool) => tool.function?.name === SETUP_TOOL_NAME
+  )));
 }
 
 class SetupService {
@@ -50,6 +93,7 @@ class SetupService {
       const baseUrl = String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
       console.log('Validating Paperless config for:', baseUrl + '/api/documents/');
       const response = await axios.get(`${baseUrl}/api/documents/`, {
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -67,6 +111,7 @@ class SetupService {
       try {
         console.log(`Validating API permissions for ${baseUrl}/api/${endpoint}/`);
         const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
+          timeout: SETUP_VALIDATION_TIMEOUT_MS,
           headers: {
             'Authorization': `Token ${token}`
           }
@@ -88,17 +133,13 @@ class SetupService {
   async validateOpenAIConfig(apiKey?: string, selectedModel?: string): Promise<boolean> {
     if (apiKey) {
       try {
-        const openai = new OpenAI({ apiKey });
+        const openai = new OpenAI({ apiKey, timeout: SETUP_VALIDATION_TIMEOUT_MS });
         const model = selectedModel || process.env.OPENAI_MODEL || 'gpt-5.4-nano';
-        const response = await openai.chat.completions.create({
-          model,
-          messages: [{ role: "user", content: "Reply with the single word: ok" }],
-          ...tokenLimitParam(model, 8)
-        });
+        const response = await openai.chat.completions.create(toolValidationRequest(model));
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-        return response.choices && response.choices.length > 0;
+        return hasSetupToolCall(response);
       } catch (error) {
         console.error('OpenAI validation error:', errorMessage(error));
         return false;
@@ -120,19 +161,16 @@ class SetupService {
       const openai = new OpenAI({
         apiKey,
         baseURL: baseUrl,
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         defaultHeaders: {
           'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'https://github.com/arturict/tagvico-ai',
           'X-Title': 'Tagvico AI'
         }
       });
 
-      const response = await openai.chat.completions.create({
-        model,
-        messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-        ...tokenLimitParam(model, 8)
-      });
+      const response = await openai.chat.completions.create(toolValidationRequest(model));
 
-      return !!response?.choices?.length;
+      return hasSetupToolCall(response);
     } catch (error) {
       console.error('OpenRouter validation error:', errorMessage(error));
       return false;
@@ -154,12 +192,10 @@ class SetupService {
       const openai = new OpenAI({ 
         apiKey: config.apiKey, 
         baseURL: config.baseURL,
+        timeout: SETUP_VALIDATION_TIMEOUT_MS
       });
-      const completion = await openai.chat.completions.create({
-        messages: [{ role: "user", content: "Test" }],
-        model: config.model,
-      });
-      return completion.choices && completion.choices.length > 0;
+      const completion = await openai.chat.completions.create(toolValidationRequest(config.model));
+      return hasSetupToolCall(completion);
     } catch (error) {
       console.error('Custom AI validation error:', errorMessage(error));
       return false;
@@ -187,6 +223,7 @@ class SetupService {
         prompt: 'Test',
         stream: false
       }, {
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined
       });
       return response.data && response.data.response;
@@ -204,16 +241,14 @@ class SetupService {
           apiKey,
           endpoint,
           deployment: deploymentName,
-          apiVersion
+          apiVersion,
+          timeout: SETUP_VALIDATION_TIMEOUT_MS
         });
-        const response = await openai.chat.completions.create({
-          model: deploymentName,
-          messages: [{ role: "user", content: "Test" }],
-        });
+        const response = await openai.chat.completions.create(toolValidationRequest(deploymentName));
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-        return response.choices && response.choices.length > 0;
+        return hasSetupToolCall(response);
       } catch (error) {
         console.error('OpenAI validation error:', errorMessage(error));
         return false;

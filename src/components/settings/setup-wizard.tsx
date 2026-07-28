@@ -231,8 +231,8 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
         setState((current) => ({ ...current, modelId: validatedModelId }));
         setStatus({
           kind: 'success',
-          message: body.validationMode === 'chat'
-            ? 'Runtime and selected chat model verified with a test response. You can continue.'
+          message: body.validationMode === 'tool'
+            ? 'Runtime and selected model verified with a safe test tool call. You can continue.'
             : 'Runtime account and selected model verified in its live catalog. You can continue.'
         });
       } else {
@@ -513,7 +513,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       </SettingsRow> : null}
       <SettingsRow
         title="Model"
-        description="Catalog entries prove availability only. Tagvico verifies the exact selected model with a minimal chat request before continuing."
+        description="Catalog entries prove availability only. Tagvico verifies the exact selected model with a safe test tool call before continuing."
         stack
       >
         <div className="settings-fields-grid">

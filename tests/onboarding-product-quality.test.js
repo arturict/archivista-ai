@@ -23,7 +23,7 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   assert.match(providerInvalidation, /modelId: ''/);
   assert.match(wizard, /validatedModelId/);
   assert.match(wizard, /Model ID/);
-  assert.match(wizard, /minimal chat request/);
+  assert.match(wizard, /safe test tool call/);
   assert.doesNotMatch(wizard, /discovered\[0\]\.id/);
   assert.match(wizard, /if \(probeId !== providerProbeId\.current\) return/);
   assert.match(read('routes/setup.ts'), /codexAuthService\.models\(\)/);
@@ -49,10 +49,14 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(route, /modelId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\)/);
   assert.match(route, /validateProviderSetupModel\(input\.instanceId, values, input\.modelId\)/);
   assert.match(route, /supportsCompanionModel\(model, input\.instanceId\)/);
-  assert.match(route, /capabilities: \['chat'\]/);
+  assert.match(route, /capabilities: \['chat', 'tools'\]/);
   assert.match(route, /validatedModelId/);
   assert.match(validation, /validateCustomConfig\(values\.baseUrl, values\.apiKey, model\)/);
   assert.match(validation, /validateOpenAIConfig\(values\.apiKey, model\)/);
+  assert.match(setupService, /confirm_tagvico_tool_support/);
+  assert.match(setupService, /tool_choice/);
+  assert.match(setupService, /hasSetupToolCall/);
+  assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
   assert.match(setupService, /selectedModel \|\| process\.env\.OPENAI_MODEL/);
   assert.match(setupRoutes, /validateOpenAIConfig\(\s*providerConfig\.openaiApiKey,\s*providerConfig\.selectedModel/);
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
@@ -82,6 +86,7 @@ test('setup is serialized and remains retryable until the owner exists', () => {
     handler.indexOf('documentModel.addUser') < handler.indexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
   );
   assert.match(handler, /Initial setup remains open for retry/);
+  assert.match(read('services/paperlessService.ts'), /timeout: PAPERLESS_REQUEST_TIMEOUT_MS/);
 });
 
 test('account providers are selected atomically with a live model', () => {
@@ -191,7 +196,7 @@ test('landing metrics stay separate, anonymous and privacy-signal aware', () => 
   assert.doesNotMatch(landing, /localStorage\./);
 });
 
-test('public metrics receiver rejects foreign origins and suppresses small installation counts', async () => {
+test('public metrics receiver rejects foreign origins, bounds writes and suppresses small installation counts', async () => {
   const source = read('telemetry/worker.js');
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
   const worker = (await import(moduleUrl)).default;
@@ -211,7 +216,17 @@ test('public metrics receiver rejects foreign origins and suppresses small insta
       ];
     }
   };
-  const env = { DB: db, PUBLIC_ORIGIN: 'https://tagvico.example' };
+  let pageviewAllowed = true;
+  const env = {
+    DB: db,
+    PUBLIC_ORIGIN: 'https://tagvico.example',
+    PAGEVIEW_RATE_LIMITER: {
+      async limit({ key }) {
+        assert.equal(key, 'landing-pageview');
+        return { success: pageviewAllowed };
+      }
+    }
+  };
 
   const rejected = await worker.fetch(new Request('https://metrics.example/v1/pageview', {
     method: 'POST',
@@ -225,6 +240,22 @@ test('public metrics receiver rejects foreign origins and suppresses small insta
   }), env);
   assert.equal(accepted.status, 202);
   assert.ok(statements.some((sql) => sql.includes('landing_pageviews')));
+
+  const writesBeforeLimit = statements.length;
+  pageviewAllowed = false;
+  const limited = await worker.fetch(new Request('https://metrics.example/v1/pageview', {
+    method: 'POST',
+    headers: { origin: env.PUBLIC_ORIGIN }
+  }), env);
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get('retry-after'), '60');
+  assert.equal(statements.length, writesBeforeLimit);
+
+  const unavailable = await worker.fetch(new Request('https://metrics.example/v1/pageview', {
+    method: 'POST',
+    headers: { origin: env.PUBLIC_ORIGIN }
+  }), { DB: db, PUBLIC_ORIGIN: env.PUBLIC_ORIGIN });
+  assert.equal(unavailable.status, 503);
 
   const summary = await worker.fetch(new Request('https://metrics.example/v1/public-summary', {
     headers: { origin: env.PUBLIC_ORIGIN }

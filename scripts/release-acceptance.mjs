@@ -70,7 +70,7 @@ const selectedProviderProbe = await responseJson(await request('/api/setup/v3/pr
 }));
 assert.equal(selectedProviderProbe.response.status, 200, JSON.stringify(selectedProviderProbe.body));
 assert.equal(selectedProviderProbe.body.validatedModelId, setupPayload.provider.modelId);
-assert.equal(selectedProviderProbe.body.validationMode, 'chat');
+assert.equal(selectedProviderProbe.body.validationMode, 'tool');
 
 const cataloglessProviderProbe = await responseJson(await request('/api/setup/v3/provider-probe', {
   method: 'POST',
@@ -86,7 +86,7 @@ const cataloglessProviderProbe = await responseJson(await request('/api/setup/v3
 }));
 assert.equal(cataloglessProviderProbe.response.status, 200, JSON.stringify(cataloglessProviderProbe.body));
 assert.equal(cataloglessProviderProbe.body.validatedModelId, setupPayload.provider.modelId);
-assert.equal(cataloglessProviderProbe.body.validationMode, 'chat');
+assert.equal(cataloglessProviderProbe.body.validationMode, 'tool');
 assert.deepEqual(cataloglessProviderProbe.body.models.map((model) => model.id), [setupPayload.provider.modelId]);
 
 const setup = await responseJson(await request('/api/setup/v3', { method: 'POST', headers, body: JSON.stringify(setupPayload) }));

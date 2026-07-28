@@ -67,6 +67,29 @@ const server = http.createServer(async (request, response) => {
   }
   if (['/v1/chat/completions', '/catalogless/chat/completions'].includes(path) && request.method === 'POST') {
     const body = await readBody(request);
+    const forcedToolName = body.tool_choice?.function?.name;
+    if (!body.stream && forcedToolName) {
+      return json(response, 200, {
+        id: 'chatcmpl-release-setup-tool',
+        object: 'chat.completion',
+        created: 0,
+        model: body.model || 'release-mock',
+        choices: [{
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: null,
+            tool_calls: [{
+              id: 'call_release_setup_check',
+              type: 'function',
+              function: { name: forcedToolName, arguments: JSON.stringify({ supported: true }) }
+            }]
+          },
+          finish_reason: 'tool_calls'
+        }],
+        usage: { prompt_tokens: 12, completion_tokens: 6, total_tokens: 18 }
+      });
+    }
     const requestsProposal = JSON.stringify(body.messages || []).includes('Prepare a follow-up action');
     const requestsDocumentRead = JSON.stringify(body.messages || []).includes('When is the insurance renewal due');
     const hasToolResult = Array.isArray(body.messages) && body.messages.some((message) => message.role === 'tool');

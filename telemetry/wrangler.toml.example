@@ -10,5 +10,13 @@ binding = "DB"
 database_name = "tagvico-telemetry"
 database_id = "REPLACE_ME"
 
+[[ratelimits]]
+name = "PAGEVIEW_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
 [triggers]
 crons = ["17 3 * * *"]

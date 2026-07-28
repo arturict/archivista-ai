@@ -103,6 +103,12 @@ identifiers, fingerprint browsers, send a referrer, or build a cross-site
 profile. It increments one UTC-day total. Those totals expire after 93 days and
 represent requests, not unique people.
 
+The receiver fails closed unless its shared-key pageview rate limiter is
+available. The limiter caps accepted writes per Cloudflare location without
+adding an IP address, cookie, visitor identifier, or fingerprint to Tagvico's
+data. It bounds abuse and write cost; it does not turn page views into a
+unique-person metric.
+
 The browser skips the request when Global Privacy Control or Do Not Track is
 enabled. Delivery infrastructure still processes the network address while
 routing a request, so the receiver must run with request logs disabled or

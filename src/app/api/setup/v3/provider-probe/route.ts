@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       const discoveredSelection = discoveredModels.find((model) => model.id === input.modelId);
       const selectionContract = discoveredSelection || {
         id: input.modelId,
-        capabilities: ['chat']
+        capabilities: ['chat', 'tools']
       };
       if (!supportsCompanionModel(selectionContract, input.instanceId)) {
         throw new ApiError(
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
           name: input.modelId,
           isDefault: true,
           options: [],
-          capabilities: ['chat']
+          capabilities: ['chat', 'tools']
         }];
       }
     } else if (discoveryError) {
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       ok: true,
       ...(validatedModelId ? {
         validatedModelId,
-        validationMode: definition.manualModelInput ? 'chat' : 'catalog'
+        validationMode: definition.manualModelInput ? 'tool' : 'catalog'
       } : {}),
       models: models.map((model) => ({
         id: model.id,

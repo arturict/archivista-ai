@@ -32,6 +32,11 @@ addresses, user agents, hostnames, or referrers. Daily aggregate rows expire
 after 93 days. The script skips collection when Global Privacy Control or Do
 Not Track is enabled.
 
+The receiver also requires a Cloudflare Workers Rate Limiting binding before
+it writes a pageview. The limiter uses one shared route key, not an IP address
+or visitor identifier, and caps accepted writes per Cloudflare location. This
+is an abuse and cost bound, not a unique-person estimate.
+
 The network and hosting provider necessarily process an IP address long enough
 to deliver the request. Before deployment, request logging must be disabled or
 minimized, retention and processor terms must be reviewed, and the public
@@ -83,6 +88,8 @@ Do not enable the counter if any of these conditions is false:
 - the endpoint is first-party and accepts only the exact public origin;
 - no cookie, storage ID, fingerprint, referrer, full URL, IP, or user agent is
   stored;
+- the shared-key pageview rate limiter is enabled and the endpoint fails closed
+  if it is unavailable;
 - infrastructure request logs are disabled or minimized;
 - only aggregate daily page views are retained, for no more than 93 days;
 - Global Privacy Control and Do Not Track are honored;
