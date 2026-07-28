@@ -4109,9 +4109,22 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
       }
     } else if (providerConfig.provider === 'copilot') {
       const status = await copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken });
-      if (!status.ok) {
+      if (!status.ok || !status.models.includes(providerConfig.selectedModel)) {
         return res.status(400).json({
-          error: `GitHub Copilot connection failed: ${status.error || 'sign in with copilot auth login or provide a supported GitHub token.'}`
+          error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`
+        });
+      }
+    } else if (providerConfig.provider === 'codex') {
+      try {
+        const models = await codexAuthService.models();
+        if (!models.some((model: { id?: string }) => model.id === providerConfig.selectedModel)) {
+          return res.status(400).json({
+            error: 'ChatGPT subscription connection failed. Sign in again and choose an available model.'
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          error: 'ChatGPT subscription connection failed. Complete device sign-in and retry.'
         });
       }
     } else if (providerConfig.provider === 'compatible') {
@@ -4497,9 +4510,24 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
       }
     } else if (providerConfig.provider === 'copilot') {
       const status = await copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken || currentConfig.COPILOT_GITHUB_TOKEN });
-      if (!status.ok) {
+      const selectedModel = providerConfig.selectedModel || currentConfig.COPILOT_MODEL;
+      if (!status.ok || !status.models.includes(selectedModel)) {
         return res.status(400).json({
-          error: `GitHub Copilot connection failed: ${status.error || 'sign in with copilot auth login or provide a supported GitHub token.'}`
+          error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`
+        });
+      }
+    } else if (providerConfig.provider === 'codex') {
+      const selectedModel = providerConfig.selectedModel || currentConfig.CODEX_MODEL;
+      try {
+        const models = await codexAuthService.models();
+        if (!models.some((model: { id?: string }) => model.id === selectedModel)) {
+          return res.status(400).json({
+            error: 'ChatGPT subscription connection failed. Sign in again and choose an available model.'
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          error: 'ChatGPT subscription connection failed. Complete device sign-in and retry.'
         });
       }
     } else if (providerConfig.provider === 'compatible') {
