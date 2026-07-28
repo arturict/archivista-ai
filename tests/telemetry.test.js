@@ -22,4 +22,9 @@ test('telemetry scheduling spreads startup and retry heartbeats across bounded w
   assert.equal(telemetryService.jitteredDelay(15_000, 45_000, () => 0), 15_000);
   assert.equal(telemetryService.jitteredDelay(15_000, 45_000, () => 0.5), 37_500);
   assert.equal(telemetryService.jitteredDelay(15_000, 45_000, () => 1), 59_999);
+  assert.equal(telemetryService.retryableStatus(undefined), true);
+  assert.equal(telemetryService.retryableStatus(429), true);
+  assert.equal(telemetryService.retryableStatus(503), true);
+  assert.equal(telemetryService.retryableStatus(400), false);
+  assert.equal(telemetryService.retryableStatus(401), false);
 });

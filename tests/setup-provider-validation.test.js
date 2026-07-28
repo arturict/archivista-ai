@@ -44,10 +44,19 @@ test('Ollama setup accepts only a verified tool call from the selected model', a
   assert.equal(captured[2].headers.Authorization, 'Bearer cloud-token');
 
   axios.post = async () => ({
-    data: { message: { content: 'Tools are supported.' } }
+    data: {
+      message: {
+        tool_calls: [{
+          function: {
+            name: 'confirm_tagvico_tool_support',
+            arguments: { supported: false }
+          }
+        }]
+      }
+    }
   });
   assert.equal(
-    await setupService.validateOllamaConfig('http://ollama.internal:11434', 'text-only'),
+    await setupService.validateOllamaConfig('http://ollama.internal:11434', 'broken-tools'),
     false
   );
 });

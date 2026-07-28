@@ -53,13 +53,29 @@ function hasSetupToolCall(response: unknown): boolean {
   const choices = (response as {
     choices?: Array<{
       message?: {
-        tool_calls?: Array<{ function?: { name?: string } }>;
+        tool_calls?: Array<{ function?: { name?: string; arguments?: unknown } }>;
       };
     }>;
   } | null)?.choices;
   return Boolean(choices?.some((choice) => choice.message?.tool_calls?.some(
     (tool) => tool.function?.name === SETUP_TOOL_NAME
+      && hasSupportedSetupArguments(tool.function.arguments)
   )));
+}
+
+function hasSupportedSetupArguments(value: unknown): boolean {
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  return record.supported === true
+    && Object.keys(record).length === 1;
 }
 
 class SetupService {
@@ -243,8 +259,9 @@ class SetupService {
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined
       });
       return Boolean(response.data?.message?.tool_calls?.some(
-        (tool: { function?: { name?: string } }) =>
+        (tool: { function?: { name?: string; arguments?: unknown } }) =>
           tool.function?.name === SETUP_TOOL_NAME
+          && hasSupportedSetupArguments(tool.function.arguments)
       ));
     } catch (error) {
       console.error('Ollama validation error:', errorMessage(error));

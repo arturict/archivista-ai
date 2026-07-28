@@ -21,8 +21,10 @@ visitor identifier, or fingerprint to Tagvico's data. Installation reports
 remain unauthenticated, so the public total is a bounded, opted-in signal rather
 than a verified user count. Clients spread their first and daily sends across
 randomized windows and retry a failed send after a randomized 5 to 15 minute
-delay, so restarts and upgrades do not synchronize every installation behind
-the shared cap.
+delay. Short retries are limited to two and apply only to network failures,
+timeouts, rate limits, and server errors; persistent or non-transient failures
+return to the next daily window. Restarts and upgrades therefore do not
+synchronize every installation behind the shared cap.
 
 Network infrastructure still processes an IP address while delivering a
 request. Review the hosting provider's own request-log, data-processing,

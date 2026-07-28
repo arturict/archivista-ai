@@ -19,6 +19,7 @@ let active = false;
 let scheduleGeneration = 0;
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
+const MAX_SHORT_RETRIES = 2;
 
 function enabled(env = process.env): boolean {
   return ['yes', 'true', '1', 'on'].includes(String(env.TAGVICO_TELEMETRY_ENABLED || '').toLowerCase());
@@ -88,17 +89,30 @@ function jitteredDelay(
   return baseMs + Math.floor(sample * jitterMs);
 }
 
-function schedule(delayMs: number, generation: number) {
+function retryableStatus(status?: number) {
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
+
+function schedule(delayMs: number, generation: number, retriesRemaining = MAX_SHORT_RETRIES) {
   if (!active || generation !== scheduleGeneration) return;
   timer = setTimeout(async () => {
     timer = null;
     try {
       await sendNow();
-      schedule(jitteredDelay(DAY_MS, 60 * MINUTE_MS), generation);
+      schedule(jitteredDelay(DAY_MS, 60 * MINUTE_MS), generation, MAX_SHORT_RETRIES);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn('[TELEMETRY] Heartbeat was not sent:', message);
-      schedule(jitteredDelay(5 * MINUTE_MS, 10 * MINUTE_MS), generation);
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (retriesRemaining > 0 && retryableStatus(status)) {
+        schedule(
+          jitteredDelay(5 * MINUTE_MS, 10 * MINUTE_MS),
+          generation,
+          retriesRemaining - 1
+        );
+      } else {
+        schedule(jitteredDelay(DAY_MS, 60 * MINUTE_MS), generation, MAX_SHORT_RETRIES);
+      }
     }
   }, delayMs);
   timer.unref?.();
@@ -118,4 +132,4 @@ function stop() {
   scheduleGeneration += 1;
 }
 
-export = { buildPayload, enabled, jitteredDelay, sendNow, start, stop };
+export = { buildPayload, enabled, jitteredDelay, retryableStatus, sendNow, start, stop };

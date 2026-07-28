@@ -47,6 +47,9 @@ test('provider probe validates the selected model and supports catalog-less comp
   const fixture = read('tests/fixtures/release-mock-server.mjs');
 
   assert.match(route, /modelId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\)/);
+  assert.match(route, /PROBE_MAX_CONCURRENT = 3/);
+  assert.match(route, /releaseAdmission = acquireProbeAdmission\(\)/);
+  assert.match(route, /finally\s*\{\s*releaseAdmission\?\.\(\)/);
   assert.match(route, /validateProviderSetupModel\(input\.instanceId, values, input\.modelId\)/);
   assert.match(route, /supportsCompanionModel\(model, input\.instanceId\)/);
   assert.match(route, /capabilities: \['chat', 'tools'\]/);
@@ -63,6 +66,8 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /confirm_tagvico_tool_support/);
   assert.match(setupService, /tool_choice/);
   assert.match(setupService, /hasSetupToolCall/);
+  assert.match(setupService, /hasSupportedSetupArguments/);
+  assert.match(setupService, /record\.supported === true/);
   assert.match(setupService, /\/api\/chat/);
   assert.match(setupService, /message\?\.tool_calls/);
   assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
@@ -72,6 +77,7 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
   assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
   assert.match(fixture, /\/catalogless\/chat\/completions/);
+  assert.match(fixture, /\/__release\/config/);
   assert.match(fixture, /text-embedding-release/);
 });
 
@@ -178,8 +184,9 @@ test('Docker release fixture keeps the mock document IDs used by acceptance', ()
   assert.doesNotMatch(compose, /PAPERLESS_API_URL:/);
   assert.match(fixture, /RELEASE_DOCUMENT_ID \|\| 42/);
   assert.match(fixture, /RELEASE_ACTION_DOCUMENT_ID \|\| 43/);
-  assert.match(acceptance, /doc:42/);
-  assert.match(acceptance, /for \(const documentId of \[42, 43\]\)/);
+  assert.match(acceptance, /paperless-ngx:8000/);
+  assert.match(acceptance, /\/api\/documents\/post_document\//);
+  assert.match(acceptance, /paperlessDocumentIds: \[releaseDocumentId, releaseActionDocumentId\]/);
 });
 
 test('manual Paperless option failures return a retryable response instead of rejecting the route', () => {

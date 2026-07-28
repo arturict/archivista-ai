@@ -1,8 +1,8 @@
 import http from 'node:http';
 
 const port = Number(process.env.PORT || 4010);
-const releaseDocumentId = Number(process.env.RELEASE_DOCUMENT_ID || 42);
-const releaseActionDocumentId = Number(process.env.RELEASE_ACTION_DOCUMENT_ID || 43);
+let releaseDocumentId = Number(process.env.RELEASE_DOCUMENT_ID || 42);
+let releaseActionDocumentId = Number(process.env.RELEASE_ACTION_DOCUMENT_ID || 43);
 const documents = new Map([
   [42, {
     id: 42,
@@ -52,7 +52,28 @@ const server = http.createServer(async (request, response) => {
   const path = url.pathname;
 
   if (path === '/health') return json(response, 200, { ok: true });
-  if (path === '/__release/state') return json(response, 200, { documents: [...documents.values()], tags, customFields, groundedDocumentReads });
+  if (path === '/__release/state') {
+    return json(response, 200, {
+      documents: [...documents.values()],
+      tags,
+      customFields,
+      groundedDocumentReads,
+      releaseDocumentId,
+      releaseActionDocumentId
+    });
+  }
+  if (path === '/__release/config' && request.method === 'POST') {
+    const body = await readBody(request);
+    const documentId = Number(body.releaseDocumentId);
+    const actionDocumentId = Number(body.releaseActionDocumentId);
+    if (!Number.isInteger(documentId) || documentId <= 0
+      || !Number.isInteger(actionDocumentId) || actionDocumentId <= 0) {
+      return json(response, 400, { error: 'Valid release document IDs are required' });
+    }
+    releaseDocumentId = documentId;
+    releaseActionDocumentId = actionDocumentId;
+    return json(response, 200, { releaseDocumentId, releaseActionDocumentId });
+  }
   if ((path === '/' || path === '/api/' || path === '/api') && request.headers.authorization === 'Token release-paperless-token') {
     return json(response, 200, { paperless_version: 'release-fixture' });
   }

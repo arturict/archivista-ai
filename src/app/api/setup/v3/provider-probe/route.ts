@@ -8,6 +8,12 @@ import validateProviderSetupModel from '@root/services/providerSetupValidation';
 
 const providerRegistryModule = require('@root/services/providerRegistry');
 const providerRegistry = providerRegistryModule.default || providerRegistryModule;
+const PROBE_WINDOW_MS = 60_000;
+const PROBE_MAX_PER_WINDOW = 20;
+const PROBE_MAX_CONCURRENT = 3;
+let probeWindowStartedAt = 0;
+let probeWindowCount = 0;
+let activeProbes = 0;
 
 const requestSchema = z.object({
   instanceId: providerInstanceIdSchema,
@@ -38,9 +44,30 @@ function safeDiscoveryError(error: unknown) {
     : 'The runtime could not be reached. Check its URL, credentials, and network access.';
 }
 
+function acquireProbeAdmission() {
+  const now = Date.now();
+  if (now - probeWindowStartedAt >= PROBE_WINDOW_MS) {
+    probeWindowStartedAt = now;
+    probeWindowCount = 0;
+  }
+  if (probeWindowCount >= PROBE_MAX_PER_WINDOW || activeProbes >= PROBE_MAX_CONCURRENT) {
+    throw new ApiError(429, 'Too many runtime checks are already in progress. Wait a moment and retry.');
+  }
+  probeWindowCount += 1;
+  activeProbes += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeProbes -= 1;
+  };
+}
+
 export async function POST(request: Request) {
+  let releaseAdmission: (() => void) | undefined;
   try {
     await assertInitialSetupOpen(request);
+    releaseAdmission = acquireProbeAdmission();
 
     const input = requestSchema.parse(await readJsonBody(request, 32 * 1024));
     const definition = providerRegistry.getProviderDefinition(input.instanceId);
@@ -127,5 +154,7 @@ export async function POST(request: Request) {
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return apiError(error);
+  } finally {
+    releaseAdmission?.();
   }
 }

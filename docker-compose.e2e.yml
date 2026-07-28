@@ -66,6 +66,9 @@ services:
     command: ["node", "tests/fixtures/release-mock-server.mjs"]
     environment:
       PORT: "4010"
+      TAGVICO_ACCEPTANCE_PAPERLESS_URL: http://paperless-ngx:8000
+      TAGVICO_ACCEPTANCE_PAPERLESS_USERNAME: tagvico-e2e
+      TAGVICO_ACCEPTANCE_PAPERLESS_PASSWORD: tagvico-e2e-password
     volumes:
       - .:/workspace:ro
     healthcheck:
