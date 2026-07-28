@@ -1,17 +1,13 @@
 import { setupV3Schema } from '@root/contracts/provider';
-import { assertSameOrigin, apiError, ApiError, readJsonBody } from '@/lib/server/auth';
+import { apiError, ApiError, readJsonBody } from '@/lib/server/auth';
+import { assertInitialSetupOpen } from '@/lib/server/initial-setup';
 
 const providerRegistryModule = require('@root/services/providerRegistry');
 const providerRegistry = providerRegistryModule.default || providerRegistryModule;
 
 export async function POST(request: Request) {
   try {
-    await assertSameOrigin(request);
-    if (process.env.ALLOW_REMOTE_SETUP !== 'yes') {
-      return Response.json({
-        error: 'Setup through the web application is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.'
-      }, { status: 403 });
-    }
+    await assertInitialSetupOpen(request);
     const input = setupV3Schema.parse(await readJsonBody(request));
     const definition = providerRegistry.getProviderDefinition(input.provider.instanceId);
     if (!definition) {

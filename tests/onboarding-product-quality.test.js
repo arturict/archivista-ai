@@ -9,6 +9,8 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   const wizard = read('src/components/settings/setup-wizard.tsx');
   assert.match(wizard, /fetch\('\/api\/paperless\/probe'/);
   assert.match(wizard, /fetch\('\/api\/setup\/v3\/provider-probe'/);
+  assert.match(wizard, /fetch\('\/api\/setup\/v3\/codex\/login'/);
+  assert.match(wizard, /ChatGPT account/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
@@ -47,14 +49,42 @@ test('mobile settings navigation scrolls internally without widening the page', 
   assert.match(mobileSettings, /margin-right:\s*0/);
 });
 
-test('Companion relative dates hydrate from one server timestamp and locale', () => {
+test('Companion relative dates hydrate from one server timestamp and advance after mount', () => {
   const page = read('src/app/(app)/companion/page.tsx');
   const companion = read('src/components/companion.tsx');
   assert.match(page, /renderedAt=\{Date\.now\(\)\}/);
-  assert.match(companion, /relativeDate\(session\.updated_at,\s*renderedAt\)/);
+  assert.match(companion, /useState\(renderedAt\)/);
+  assert.match(companion, /setInterval\(\(\) => setReferenceTime\(Date\.now\(\)\), 60_000\)/);
+  assert.match(companion, /relativeDate\(session\.updated_at,\s*referenceTime\)/);
   assert.match(companion, /Intl\.RelativeTimeFormat\('en'/);
   assert.match(companion, /value\.replace\(' ', 'T'\).*Z/);
   assert.doesNotMatch(companion, /timestamp - Date\.now\(\)/);
+});
+
+test('subscription sign-in routes are limited to the open initial setup window', () => {
+  const start = read('src/app/api/setup/v3/codex/login/route.ts');
+  const poll = read('src/app/api/setup/v3/codex/login/[id]/route.ts');
+  const cancel = read('src/app/api/setup/v3/codex/login/[id]/cancel/route.ts');
+  const guard = read('src/lib/server/initial-setup.ts');
+  for (const route of [start, poll, cancel]) {
+    assert.match(route, /assertInitialSetupOpen\(request\)/);
+    assert.doesNotMatch(route, /requireApiUser/);
+  }
+  assert.match(guard, /assertSameOrigin\(request\)/);
+  assert.match(guard, /ALLOW_REMOTE_SETUP !== 'yes'/);
+  assert.match(guard, /getBackendConfigurationState/);
+  assert.match(guard, /Initial setup is complete/);
+});
+
+test('Docker release fixture keeps the mock document IDs used by acceptance', () => {
+  const compose = read('docker-compose.e2e.yml');
+  const fixture = read('tests/fixtures/release-mock-server.mjs');
+  const acceptance = read('scripts/release-acceptance.mjs');
+  assert.doesNotMatch(compose, /RELEASE_(?:ACTION_)?DOCUMENT_ID/);
+  assert.match(fixture, /RELEASE_DOCUMENT_ID \|\| 42/);
+  assert.match(fixture, /RELEASE_ACTION_DOCUMENT_ID \|\| 43/);
+  assert.match(acceptance, /doc:42/);
+  assert.match(acceptance, /for \(const documentId of \[42, 43\]\)/);
 });
 
 test('landing metrics stay separate, anonymous and privacy-signal aware', () => {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { assertSameOrigin, apiError, ApiError, readJsonBody } from '@/lib/server/auth';
-import { getBackendConfigurationState } from '@/lib/server/system';
+import { apiError, ApiError, readJsonBody } from '@/lib/server/auth';
+import { assertInitialSetupOpen } from '@/lib/server/initial-setup';
 import { providerInstanceIdSchema } from '@root/contracts/provider';
 import providerDiscoveryService from '@root/services/providerDiscoveryService';
 
@@ -37,19 +37,7 @@ function safeDiscoveryError(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    await assertSameOrigin(request);
-    if (process.env.ALLOW_REMOTE_SETUP !== 'yes') {
-      return Response.json({
-        error: 'Setup through the web application is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.'
-      }, { status: 403 });
-    }
-    const configured = await getBackendConfigurationState();
-    if (configured === true) {
-      throw new ApiError(409, 'Initial setup is complete. Test runtimes from Settings.');
-    }
-    if (configured === null) {
-      throw new ApiError(503, 'Tagvico could not confirm the initial setup state. Try again after the health check succeeds.');
-    }
+    await assertInitialSetupOpen(request);
 
     const input = requestSchema.parse(await readJsonBody(request, 32 * 1024));
     const definition = providerRegistry.getProviderDefinition(input.instanceId);

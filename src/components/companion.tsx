@@ -262,6 +262,7 @@ export function Companion({
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState('');
+  const [referenceTime, setReferenceTime] = useState(renderedAt);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -293,6 +294,11 @@ export function Companion({
   );
 
   useEffect(() => setSessions(initialSessions), [initialSessions]);
+  useEffect(() => {
+    setReferenceTime(Date.now());
+    const timer = window.setInterval(() => setReferenceTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: isWorking ? 'smooth' : 'instant', block: 'end' });
   }, [isWorking, messages]);
@@ -465,7 +471,7 @@ export function Companion({
           </form> : <>
             <button type="button" className="companion-session-open" onClick={() => router.push(`/companion?chat=${encodeURIComponent(session.id)}`)}>
               <strong>{session.title || 'New conversation'}</strong>
-              <small>{session.preview || `${Number(session.message_count) || 0} messages`} · {relativeDate(session.updated_at, renderedAt)}</small>
+              <small>{session.preview || `${Number(session.message_count) || 0} messages`} · {relativeDate(session.updated_at, referenceTime)}</small>
             </button>
             <div className="companion-session-actions">
               <button type="button" onClick={() => { setEditingSession(session.id); setTitleDraft(session.title || 'New conversation'); }} aria-label={`Rename ${session.title || 'conversation'}`}><Pencil /></button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, FileStack, KeyRound, Sparkles } from 'lucide-react';
 import { InlineStatus } from './inline-status';
@@ -61,6 +61,9 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   const [models, setModels] = useState<SetupModel[]>([]);
   const [status, setStatus] = useState<SetupStatus>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [codexLoginId, setCodexLoginId] = useState('');
+  const [codexLoginOutput, setCodexLoginOutput] = useState('');
+  const codexPollTimer = useRef<number | null>(null);
   const provider = providers.find((candidate) => candidate.instanceId === state.providerId);
   const visibleProviders = useMemo(() => providers.filter((candidate) => candidate.available), [providers]);
 
@@ -118,6 +121,10 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     state.providerValues,
     state.username
   ]);
+
+  useEffect(() => () => {
+    if (codexPollTimer.current !== null) window.clearInterval(codexPollTimer.current);
+  }, []);
 
   const update = (key: keyof SetupState, value: string | Record<string, string>) => {
     setState((current) => ({ ...current, [key]: value }));
@@ -194,6 +201,77 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     }
   };
 
+  const stopCodexPolling = () => {
+    if (codexPollTimer.current !== null) window.clearInterval(codexPollTimer.current);
+    codexPollTimer.current = null;
+  };
+
+  const pollCodexLogin = (loginId: string) => {
+    stopCodexPolling();
+    const deadline = Date.now() + 5 * 60 * 1000;
+    codexPollTimer.current = window.setInterval(async () => {
+      if (Date.now() > deadline) {
+        stopCodexPolling();
+        setCodexLoginId('');
+        setStatus({ kind: 'error', message: 'ChatGPT sign-in timed out. Start a new device sign-in.' });
+        return;
+      }
+      try {
+        const response = await fetch(`/api/setup/v3/codex/login/${encodeURIComponent(loginId)}`, {
+          cache: 'no-store'
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'Could not check ChatGPT sign-in.');
+        setCodexLoginOutput(body.output || body.error || 'Waiting for sign-in…');
+        if (body.completed) {
+          stopCodexPolling();
+          setCodexLoginId('');
+          if (body.error) throw new Error(body.error);
+          setCodexLoginOutput('ChatGPT sign-in completed. The account token stays in Tagvico data.');
+          setStatus({ kind: 'success', message: 'ChatGPT is connected. Check the runtime to load its live models.' });
+        }
+      } catch (error) {
+        stopCodexPolling();
+        setCodexLoginId('');
+        setStatus({
+          kind: 'error',
+          message: error instanceof Error ? error.message : 'Could not complete ChatGPT sign-in.'
+        });
+      }
+    }, 1200);
+  };
+
+  const startCodexLogin = async () => {
+    setStatus({ kind: 'loading', message: 'Starting secure ChatGPT device sign-in…' });
+    try {
+      const response = await fetch('/api/setup/v3/codex/login', { method: 'POST' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Could not start ChatGPT sign-in.');
+      setCodexLoginId(body.loginId);
+      setCodexLoginOutput(body.output || 'Starting secure device sign-in…');
+      setStatus({
+        kind: 'neutral',
+        message: 'Open the verification URL shown below, enter the one-time code, then return to this tab.'
+      });
+      pollCodexLogin(body.loginId);
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Could not start ChatGPT sign-in.'
+      });
+    }
+  };
+
+  const cancelCodexLogin = async () => {
+    const loginId = codexLoginId;
+    stopCodexPolling();
+    setCodexLoginId('');
+    if (!loginId) return;
+    await fetch(`/api/setup/v3/codex/login/${encodeURIComponent(loginId)}/cancel`, {
+      method: 'POST'
+    }).catch(() => undefined);
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (step < 2) return;
@@ -236,6 +314,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   };
 
   const changeProvider = (providerId: string) => {
+    if (state.providerId === 'codex' && codexLoginId) void cancelCodexLogin();
     const nextProvider = providers.find((candidate) => candidate.instanceId === providerId);
     setModels([]);
     setState((current) => ({
@@ -344,6 +423,32 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
           </label>)}
         </div>
       </SettingsRow> : null}
+      {provider?.instanceId === 'codex' ? <SettingsRow
+        title="ChatGPT account"
+        description="A subscription runtime needs a one-time device sign-in before Tagvico can verify its live model catalog."
+        stack
+      >
+        <div className="settings-auth-panel">
+          <div className="settings-inline-actions">
+            <button
+              className="settings-button"
+              type="button"
+              disabled={Boolean(codexLoginId)}
+              onClick={() => void startCodexLogin()}
+            >
+              {codexLoginId ? 'Waiting for sign-in…' : 'Sign in with ChatGPT'}
+            </button>
+            {codexLoginId ? <button
+              className="settings-button"
+              type="button"
+              onClick={() => void cancelCodexLogin()}
+            >
+              Cancel
+            </button> : null}
+          </div>
+          {codexLoginOutput ? <pre className="settings-auth-output">{codexLoginOutput}</pre> : null}
+        </div>
+      </SettingsRow> : null}
       <SettingsRow
         title="Model"
         description="The verified model catalog appears after the connection check. Curated suggestions remain hints, not availability claims."
@@ -398,6 +503,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       </div>
       <div className="setup-submit-actions">
         {step > 0 ? <button className="settings-button" type="button" disabled={status?.kind === 'loading'} onClick={() => {
+          if (step === 1 && codexLoginId) void cancelCodexLogin();
           setStep((current) => Math.max(0, current - 1));
           setStatus(null);
         }}>Back</button> : null}
