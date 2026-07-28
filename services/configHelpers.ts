@@ -168,8 +168,13 @@ function normalizeProviderPayload(payload: ConfigLike = {}) {
     payload.anthropicModel ||
     payload.codexModel ||
     payload.customModel ||
+    payload.AI_MODEL ||
     payload.OPENROUTER_MODEL ||
     payload.OLLAMA_MODEL ||
+    payload.OLLAMA_CLOUD_MODEL ||
+    payload.OPENCODE_MODEL ||
+    payload.COPILOT_MODEL ||
+    payload.CODEX_MODEL ||
     payload.COMPATIBLE_MODEL ||
     payload.OPENAI_MODEL ||
     payload.CUSTOM_MODEL ||

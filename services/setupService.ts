@@ -334,9 +334,15 @@ class SetupService {
     return next;
   }
 
-  async savePartialConfig(patch: SetupConfig) {
+  async savePartialConfig(
+    patch: SetupConfig,
+    options: {
+      validateCurrent?: (current: SetupConfig) => void | Promise<void>;
+    } = {}
+  ) {
     const operation = this.writeQueue.then(async () => {
       const current = (await this.loadConfig()) || {};
+      await options.validateCurrent?.(current);
       await this.persistConfig({ ...current, ...patch });
     });
     this.writeQueue = operation.catch(() => {});

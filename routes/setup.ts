@@ -3927,7 +3927,20 @@ router.get('/api/health', async (req: Req, res: Res) => {
  *                   type: string
  *                   example: "Failed to save configuration: Database error"
  */
+let setupRequestQueue: Promise<void> = Promise.resolve();
+
+async function acquireSetupRequestLock(): Promise<() => void> {
+  const previous = setupRequestQueue;
+  let release = () => {};
+  setupRequestQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  return release;
+}
+
 router.post('/setup', express.json(), async (req: Req, res: Res) => {
+  const releaseSetupRequestLock = await acquireSetupRequestLock();
   try {
     // Setup is deliberately one-time. This route is public only for the first
     // local (or explicitly opted-in remote) bootstrap; accepting it after a
@@ -4156,7 +4169,10 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
       processedCustomFields
     });
 
-    // Save configuration
+    // Persist validated settings first, but do not expose the installation as
+    // complete until an owner account exists. A crash anywhere before the
+    // final marker remains safely retryable through the serialized setup path.
+    config.TAGVICO_AI_INITIAL_SETUP = 'no';
     await setupService.saveConfig(config);
     resetRuntimeServices();
     const tagProvisioning = await provisionControlledTags();
@@ -4166,7 +4182,11 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     persistWriteMode(req.body, true);
 
     const hashedPassword = await bcrypt.hash(password, 15);
-    await documentModel.addUser(username, hashedPassword);
+    const ownerCreated = await documentModel.addUser(username, hashedPassword);
+    if (!ownerCreated) {
+      throw new Error('Could not create the owner account. Initial setup remains open for retry.');
+    }
+    await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
 
     res.json({ 
       success: true,
@@ -4180,6 +4200,8 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     res.status(500).json({ 
       error: 'An error occurred: ' + errorMessage(error)
     });
+  } finally {
+    releaseSetupRequestLock();
   }
 });
 

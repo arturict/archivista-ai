@@ -192,3 +192,76 @@ test('PATCH validates subscription models before persisting v3 settings', async 
     providerDiscoveryService.discoverProviderModels = discoverProviderModels;
   }
 });
+
+test('PATCH revalidates active Copilot models when account credentials change', async () => {
+  const discoverProviderModels = providerDiscoveryService.discoverProviderModels;
+  try {
+    providerDiscoveryService.discoverProviderModels = async () => [
+      { id: 'copilot-account-model', name: 'Copilot account model' }
+    ];
+    const current = await service.getSettings();
+    await service.patchSettings({
+      revision: current.revision,
+      patch: {
+        ai: {
+          activeProviderInstanceId: 'copilot',
+          activeModelId: 'copilot-account-model'
+        }
+      }
+    });
+    const selected = await service.getSettings();
+    const before = await setupService.loadConfig();
+    providerDiscoveryService.discoverProviderModels = async () => [
+      { id: 'different-plan-model', name: 'Different plan model' }
+    ];
+    await assert.rejects(service.patchSettings({
+      revision: selected.revision,
+      patch: {
+        provider: {
+          instanceId: 'copilot',
+          values: { githubToken: 'replacement-account-token' }
+        }
+      }
+    }), /not available to this runtime account/);
+    const after = await setupService.loadConfig();
+    assert.equal(after.COPILOT_GITHUB_TOKEN, before.COPILOT_GITHUB_TOKEN);
+  } finally {
+    providerDiscoveryService.discoverProviderModels = discoverProviderModels;
+  }
+});
+
+test('PATCH rechecks optimistic concurrency after slow model discovery', async () => {
+  const discoverProviderModels = providerDiscoveryService.discoverProviderModels;
+  let releaseDiscovery;
+  let signalDiscoveryStarted;
+  const discoveryStarted = new Promise((resolve) => { signalDiscoveryStarted = resolve; });
+  const discoveryRelease = new Promise((resolve) => { releaseDiscovery = resolve; });
+  try {
+    providerDiscoveryService.discoverProviderModels = async () => {
+      signalDiscoveryStarted();
+      await discoveryRelease;
+      return [{ id: 'slow-account-model', name: 'Slow account model' }];
+    };
+    const current = await service.getSettings();
+    const slowPatch = service.patchSettings({
+      revision: current.revision,
+      patch: {
+        ai: {
+          activeProviderInstanceId: 'codex',
+          activeModelId: 'slow-account-model'
+        }
+      }
+    });
+    await discoveryStarted;
+    await service.patchSettings({
+      revision: current.revision,
+      patch: { automation: { automaticProcessing: true } }
+    });
+    releaseDiscovery();
+    await assert.rejects(slowPatch, (error) => error && error.status === 409);
+    assert.notEqual((await service.getSettings()).revision, current.revision);
+  } finally {
+    releaseDiscovery?.();
+    providerDiscoveryService.discoverProviderModels = discoverProviderModels;
+  }
+});

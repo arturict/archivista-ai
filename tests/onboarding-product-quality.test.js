@@ -65,6 +65,35 @@ test('new setup starts in review mode with scheduled scans paused', () => {
   const setupRoute = read('src/app/api/setup/v3/route.ts');
   assert.match(setupRoute, /disableAutomaticProcessing: true/);
   assert.match(setupRoute, /write_mode: 'review'/);
+  assert.match(setupRoute, /AI_MODEL: input\.provider\.modelId/);
+  assert.match(read('services/configHelpers.ts'), /payload\.AI_MODEL/);
+});
+
+test('setup is serialized and remains retryable until the owner exists', () => {
+  const setupRoutes = read('routes/setup.ts');
+  const handler = setupRoutes.slice(
+    setupRoutes.indexOf('let setupRequestQueue'),
+    setupRoutes.indexOf("router.post('/settings'")
+  );
+  assert.match(handler, /acquireSetupRequestLock/);
+  assert.match(handler, /finally\s*\{\s*releaseSetupRequestLock\(\)/);
+  assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
+  assert.ok(
+    handler.indexOf('documentModel.addUser') < handler.indexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
+  );
+  assert.match(handler, /Initial setup remains open for retry/);
+});
+
+test('account providers are selected atomically with a live model', () => {
+  const settings = read('src/components/settings/settings-workspace.tsx');
+  const selector = settings.slice(
+    settings.indexOf('const selectProvider'),
+    settings.indexOf('const selectModel')
+  );
+  assert.match(selector, /\['codex', 'copilot'\]\.includes\(instanceId\)/);
+  assert.match(selector, /const models = await loadModels\(instanceId\)/);
+  assert.match(selector, /activeProviderInstanceId: instanceId/);
+  assert.match(selector, /activeModelId: selectedModel\.id/);
 });
 
 test('first success opens Ask Tagvico and research sources link to document views', () => {

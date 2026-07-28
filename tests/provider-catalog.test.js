@@ -62,3 +62,22 @@ test('provider payload preserves a custom OpenRouter base URL', () => {
   });
   assert.equal(openrouter.openrouterBaseUrl, 'https://router.example/v1');
 });
+
+test('v3 setup preserves canonical provider model environment keys', () => {
+  for (const [provider, key, model] of [
+    ['ollama-cloud', 'OLLAMA_CLOUD_MODEL', 'cloud/account-model'],
+    ['opencode', 'OPENCODE_MODEL', 'gateway/account-model'],
+    ['copilot', 'COPILOT_MODEL', 'copilot-account-model'],
+    ['codex', 'CODEX_MODEL', 'chatgpt-account-model']
+  ]) {
+    assert.equal(helpers.normalizeProviderPayload({
+      AI_PROVIDER: provider,
+      AI_MODEL: model,
+      [key]: model
+    }).selectedModel, model);
+    assert.equal(helpers.normalizeProviderPayload({
+      AI_PROVIDER: provider,
+      [key]: model
+    }).selectedModel, model);
+  }
+});
