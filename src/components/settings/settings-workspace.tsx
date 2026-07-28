@@ -99,6 +99,7 @@ export function SettingsWorkspace({
   const [settings, setSettings] = useState(initialSettings);
   const settingsRef = useRef(initialSettings);
   const mutationQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const providerSelectionId = useRef(0);
   const toastTimer = useRef<number | null>(null);
   const codexPollTimer = useRef<number | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -192,8 +193,10 @@ export function SettingsWorkspace({
   };
 
   const selectProvider = async (instanceId: string) => {
+    const selectionId = ++providerSelectionId.current;
     if (['codex', 'copilot'].includes(instanceId)) {
       const models = await loadModels(instanceId);
+      if (selectionId !== providerSelectionId.current) return;
       const selectedModel = models.find((model) => model.id === settingsRef.current.ai.activeModelId)
         || models.find((model) => model.isDefault)
         || models[0];

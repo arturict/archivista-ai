@@ -108,7 +108,8 @@ limiters are available. The limiters cap accepted writes per Cloudflare
 location without adding an IP address, cookie, visitor identifier, or
 fingerprint to Tagvico's data. They bound abuse and write cost; they do not turn
 page views into a unique-person metric or unauthenticated installation reports
-into verified users.
+into verified users. Heartbeats use randomized send windows and retry after a
+randomized delay instead of synchronizing every restarted installation.
 
 The browser skips the request when Global Privacy Control or Do Not Track is
 enabled. Delivery infrastructure still processes the network address while

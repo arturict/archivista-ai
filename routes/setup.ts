@@ -74,6 +74,7 @@ const tagExceptionService = require('../services/tagExceptionService');
 const controlledTaggingService = require('../services/controlledTaggingService');
 const { createRateLimiter } = require('../services/rateLimiter');
 const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'login' });
+const setupLimiter = createRateLimiter({ windowMs: 60_000, max: 10, keyPrefix: 'setup' });
 const totpService = require('../services/totpService');
 const pendingMfaSecrets = new Map();
 
@@ -3929,6 +3930,8 @@ router.get('/api/health', async (req: Req, res: Res) => {
  *                   example: "Failed to save configuration: Database error"
  */
 let setupRequestQueue: Promise<void> = Promise.resolve();
+let setupPendingRequests = 0;
+const SETUP_MAX_PENDING_REQUESTS = 3;
 const SETUP_PROVIDER_TIMEOUT_MS = 15_000;
 
 async function acquireSetupRequestLock(): Promise<() => void> {
@@ -3956,9 +3959,16 @@ async function withSetupProviderTimeout<T>(operation: Promise<T>): Promise<T> {
   }
 }
 
-router.post('/setup', express.json(), async (req: Req, res: Res) => {
-  const releaseSetupRequestLock = await acquireSetupRequestLock();
+router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) => {
+  if (setupPendingRequests >= SETUP_MAX_PENDING_REQUESTS) {
+    return res.status(429).json({
+      error: 'Setup is already checking another connection. Wait a moment and retry.'
+    });
+  }
+  setupPendingRequests += 1;
+  let releaseSetupRequestLock: (() => void) | undefined;
   try {
+    releaseSetupRequestLock = await acquireSetupRequestLock();
     // Setup is deliberately one-time. This route is public only for the first
     // local (or explicitly opted-in remote) bootstrap; accepting it after a
     // configuration exists would let an unauthenticated caller replace the
@@ -4224,7 +4234,8 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
       error: 'An error occurred: ' + errorMessage(error)
     });
   } finally {
-    releaseSetupRequestLock();
+    releaseSetupRequestLock?.();
+    setupPendingRequests -= 1;
   }
 });
 

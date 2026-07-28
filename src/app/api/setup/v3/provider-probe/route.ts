@@ -67,16 +67,6 @@ export async function POST(request: Request) {
     let validatedModelId: string | undefined;
     if (input.modelId) {
       const discoveredSelection = discoveredModels.find((model) => model.id === input.modelId);
-      const selectionContract = discoveredSelection || {
-        id: input.modelId,
-        capabilities: ['chat', 'tools']
-      };
-      if (!supportsCompanionModel(selectionContract, input.instanceId)) {
-        throw new ApiError(
-          400,
-          'The selected model does not support the chat and document tools Tagvico requires.'
-        );
-      }
       if (definition.manualModelInput) {
         const valid = await validateProviderSetupModel(input.instanceId, values, input.modelId);
         if (!valid) {
@@ -85,8 +75,20 @@ export async function POST(request: Request) {
             'The selected model could not complete a test request. Check the model ID, credentials, and runtime URL.'
           );
         }
-      } else if (!models.some((model) => model.id === input.modelId)) {
-        throw new ApiError(400, 'The selected model is not available to this runtime account.');
+      } else {
+        const selectionContract = discoveredSelection || {
+          id: input.modelId,
+          capabilities: ['chat', 'tools']
+        };
+        if (!supportsCompanionModel(selectionContract, input.instanceId)) {
+          throw new ApiError(
+            400,
+            'The selected model does not support the chat and document tools Tagvico requires.'
+          );
+        }
+        if (!models.some((model) => model.id === input.modelId)) {
+          throw new ApiError(400, 'The selected model is not available to this runtime account.');
+        }
       }
       validatedModelId = input.modelId;
       if (!models.some((model) => model.id === input.modelId)) {

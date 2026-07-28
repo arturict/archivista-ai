@@ -51,6 +51,13 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(route, /supportsCompanionModel\(model, input\.instanceId\)/);
   assert.match(route, /capabilities: \['chat', 'tools'\]/);
   assert.match(route, /validatedModelId/);
+  const manualSelection = route.slice(
+    route.indexOf('if (definition.manualModelInput)'),
+    route.indexOf('validatedModelId = input.modelId')
+  );
+  assert.ok(
+    manualSelection.indexOf('validateProviderSetupModel') < manualSelection.indexOf('const selectionContract')
+  );
   assert.match(validation, /validateCustomConfig\(values\.baseUrl, values\.apiKey, model\)/);
   assert.match(validation, /validateOpenAIConfig\(values\.apiKey, model\)/);
   assert.match(setupService, /confirm_tagvico_tool_support/);
@@ -83,7 +90,10 @@ test('setup is serialized and remains retryable until the owner exists', () => {
     setupRoutes.indexOf("router.post('/settings'")
   );
   assert.match(handler, /acquireSetupRequestLock/);
-  assert.match(handler, /finally\s*\{\s*releaseSetupRequestLock\(\)/);
+  assert.match(handler, /setupPendingRequests >= SETUP_MAX_PENDING_REQUESTS/);
+  assert.match(setupRoutes, /router\.post\('\/setup', setupLimiter, express\.json\(\)/);
+  assert.match(handler, /finally\s*\{\s*releaseSetupRequestLock\?\.\(\)/);
+  assert.match(handler, /setupPendingRequests -= 1/);
   assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
   assert.ok(
     handler.indexOf('documentModel.addUser') < handler.indexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
@@ -100,6 +110,8 @@ test('account providers are selected atomically with a live model', () => {
   );
   assert.match(selector, /\['codex', 'copilot'\]\.includes\(instanceId\)/);
   assert.match(selector, /const models = await loadModels\(instanceId\)/);
+  assert.match(selector, /const selectionId = \+\+providerSelectionId\.current/);
+  assert.match(selector, /if \(selectionId !== providerSelectionId\.current\) return/);
   assert.match(selector, /activeProviderInstanceId: instanceId/);
   assert.match(selector, /activeModelId: selectedModel\.id/);
 });
@@ -152,6 +164,10 @@ test('subscription sign-in routes are limited to the open initial setup window',
   assert.match(guard, /getBackendConfigurationState/);
   assert.match(guard, /Initial setup is complete/);
   assert.match(read('src/components/settings/setup-wizard.tsx'), /setState\(\(current\) => \(\{ \.\.\.current, modelId: '' \}\)\)/);
+  assert.match(
+    read('src/components/settings/setup-wizard.tsx'),
+    /Date\.now\(\) > deadline[\s\S]*codex\/login\/\$\{encodeURIComponent\(loginId\)\}\/cancel/
+  );
 });
 
 test('Docker release fixture keeps the mock document IDs used by acceptance', () => {

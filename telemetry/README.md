@@ -19,7 +19,10 @@ key permits at most 30 heartbeat writes per minute. These bounds limit forged
 metric inflation and database-write cost without adding an IP address, cookie,
 visitor identifier, or fingerprint to Tagvico's data. Installation reports
 remain unauthenticated, so the public total is a bounded, opted-in signal rather
-than a verified user count.
+than a verified user count. Clients spread their first and daily sends across
+randomized windows and retry a failed send after a randomized 5 to 15 minute
+delay, so restarts and upgrades do not synchronize every installation behind
+the shared cap.
 
 Network infrastructure still processes an IP address while delivering a
 request. Review the hosting provider's own request-log, data-processing,

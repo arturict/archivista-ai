@@ -261,6 +261,9 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     codexPollTimer.current = window.setInterval(async () => {
       if (Date.now() > deadline) {
         stopCodexPolling();
+        await fetch(`/api/setup/v3/codex/login/${encodeURIComponent(loginId)}/cancel`, {
+          method: 'POST'
+        }).catch(() => undefined);
         setCodexLoginId('');
         setStatus({ kind: 'error', message: 'ChatGPT sign-in timed out. Start a new device sign-in.' });
         return;
