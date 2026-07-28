@@ -71,6 +71,7 @@ export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'd
   const [correspondent, setCorrespondent] = useState('');
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [archiveTotal, setArchiveTotal] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [status, setStatus] = useState('');
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -99,6 +100,7 @@ export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'd
       const payload = await fetchJson<HistoryPayload>(`/api/history?${query}`);
       setRows(payload.data || []);
       setTotal(payload.recordsFiltered || 0);
+      setArchiveTotal(payload.recordsTotal || 0);
       setSelected(new Set());
       setLoadState('ready');
     } catch (error) {
@@ -207,7 +209,7 @@ export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'd
         <button className="button" type="button" onClick={() => void validateHistory()}><ShieldCheck /> Validate history</button>
         {orphanCount ? <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'cleanup', count: orphanCount })}><Trash2 /> Clean up {orphanCount}</button> : null}
         {total > 0 ? <button className="button" type="button" onClick={() => void rescanSelected()}><RefreshCcw /> Rescan selected</button> : null}
-        {total > 0 ? <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'rescanAll' })}><RotateCcw /> Rescan all</button> : null}
+        {archiveTotal > 0 ? <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'rescanAll' })}><RotateCcw /> Rescan all</button> : null}
       </div>
     </header>
 

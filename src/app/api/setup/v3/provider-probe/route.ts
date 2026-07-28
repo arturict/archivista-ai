@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { apiError, ApiError, readJsonBody } from '@/lib/server/auth';
 import { assertInitialSetupOpen } from '@/lib/server/initial-setup';
 import { providerInstanceIdSchema, type ModelDescriptor } from '@root/contracts/provider';
+import { supportsCompanionModel } from '@root/services/companionModelService';
 import providerDiscoveryService from '@root/services/providerDiscoveryService';
 import validateProviderSetupModel from '@root/services/providerSetupValidation';
 
@@ -54,16 +55,28 @@ export async function POST(request: Request) {
     };
     assertSafeUrls(definition.fields, values);
     const environment = providerRegistry.providerValuesToEnvironment(input.instanceId, values);
-    let models: ModelDescriptor[] = [];
+    let discoveredModels: ModelDescriptor[] = [];
     let discoveryError: unknown;
     try {
-      models = await providerDiscoveryService.discoverProviderModels(input.instanceId, environment);
+      discoveredModels = await providerDiscoveryService.discoverProviderModels(input.instanceId, environment);
     } catch (error) {
       discoveryError = error;
     }
+    let models = discoveredModels.filter((model) => supportsCompanionModel(model, input.instanceId));
 
     let validatedModelId: string | undefined;
     if (input.modelId) {
+      const discoveredSelection = discoveredModels.find((model) => model.id === input.modelId);
+      const selectionContract = discoveredSelection || {
+        id: input.modelId,
+        capabilities: ['chat']
+      };
+      if (!supportsCompanionModel(selectionContract, input.instanceId)) {
+        throw new ApiError(
+          400,
+          'The selected model does not support the chat and document tools Tagvico requires.'
+        );
+      }
       if (definition.manualModelInput) {
         const valid = await validateProviderSetupModel(input.instanceId, values, input.modelId);
         if (!valid) {

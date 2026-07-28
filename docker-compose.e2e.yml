@@ -91,7 +91,6 @@ services:
     environment:
       TAGVICO_AI_PORT: "3000"
       ALLOW_REMOTE_SETUP: "yes"
-      PAPERLESS_API_URL: http://paperless-ngx:8000/api
       COOKIE_SECURE_MODE: never
     ports:
       - "${TAGVICO_E2E_APP_PORT:-4310}:3000"

@@ -2326,9 +2326,9 @@ router.get('/manual', (_req: Req, res: Res) => {
 router.get('/manual/options', async (_req: Req, res: Res) => {
   try {
     const [correspondents, documentTypes, users] = await Promise.all([
-      paperlessService.listCorrespondentsNames(),
-      paperlessService.listDocumentTypesNames(),
-      paperlessService.getUsers()
+      paperlessService.listCorrespondentsNames({ throwOnError: true }),
+      paperlessService.listDocumentTypesNames({ throwOnError: true }),
+      paperlessService.getUsers({ throwOnError: true })
     ]);
 
     res.json({

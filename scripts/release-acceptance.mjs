@@ -56,6 +56,7 @@ const providerProbe = await responseJson(await request('/api/setup/v3/provider-p
 assert.equal(providerProbe.response.status, 200, JSON.stringify(providerProbe.body));
 assert.equal(providerProbe.body.ok, true);
 assert.ok(providerProbe.body.models.some((model) => model.id === setupPayload.provider.modelId));
+assert.equal(providerProbe.body.models.some((model) => model.id === 'text-embedding-release'), false);
 assert.equal(JSON.stringify(providerProbe.body).includes(setupPayload.provider.values.apiKey), false);
 
 const selectedProviderProbe = await responseJson(await request('/api/setup/v3/provider-probe', {

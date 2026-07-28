@@ -19,11 +19,13 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   );
   assert.match(providerInvalidation, /setModels\(\[\]\)/);
   assert.match(providerInvalidation, /setVerifiedModelId\(''\)/);
+  assert.match(providerInvalidation, /providerProbeId\.current \+= 1/);
   assert.match(providerInvalidation, /modelId: ''/);
   assert.match(wizard, /validatedModelId/);
   assert.match(wizard, /Model ID/);
   assert.match(wizard, /minimal chat request/);
   assert.doesNotMatch(wizard, /discovered\[0\]\.id/);
+  assert.match(wizard, /if \(probeId !== providerProbeId\.current\) return/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
@@ -44,6 +46,7 @@ test('provider probe validates the selected model and supports catalog-less comp
 
   assert.match(route, /modelId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\)/);
   assert.match(route, /validateProviderSetupModel\(input\.instanceId, values, input\.modelId\)/);
+  assert.match(route, /supportsCompanionModel\(model, input\.instanceId\)/);
   assert.match(route, /capabilities: \['chat'\]/);
   assert.match(route, /validatedModelId/);
   assert.match(validation, /validateCustomConfig\(values\.baseUrl, values\.apiKey, model\)/);
@@ -53,6 +56,7 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
   assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
   assert.match(fixture, /\/catalogless\/chat\/completions/);
+  assert.match(fixture, /text-embedding-release/);
 });
 
 test('new setup starts in review mode with scheduled scans paused', () => {
@@ -108,6 +112,7 @@ test('subscription sign-in routes are limited to the open initial setup window',
   assert.match(guard, /ALLOW_REMOTE_SETUP !== 'yes'/);
   assert.match(guard, /getBackendConfigurationState/);
   assert.match(guard, /Initial setup is complete/);
+  assert.match(read('src/components/settings/setup-wizard.tsx'), /setState\(\(current\) => \(\{ \.\.\.current, modelId: '' \}\)\)/);
 });
 
 test('Docker release fixture keeps the mock document IDs used by acceptance', () => {
@@ -115,6 +120,7 @@ test('Docker release fixture keeps the mock document IDs used by acceptance', ()
   const fixture = read('tests/fixtures/release-mock-server.mjs');
   const acceptance = read('scripts/release-acceptance.mjs');
   assert.doesNotMatch(compose, /RELEASE_(?:ACTION_)?DOCUMENT_ID/);
+  assert.doesNotMatch(compose, /PAPERLESS_API_URL:/);
   assert.match(fixture, /RELEASE_DOCUMENT_ID \|\| 42/);
   assert.match(fixture, /RELEASE_ACTION_DOCUMENT_ID \|\| 43/);
   assert.match(acceptance, /doc:42/);
@@ -131,6 +137,17 @@ test('manual Paperless option failures return a retryable response instead of re
   assert.match(handler, /catch \(error\)/);
   assert.match(handler, /res\.status\(502\)\.json/);
   assert.match(handler, /Check the connection and retry/);
+  assert.match(handler, /listCorrespondentsNames\(\{ throwOnError: true \}\)/);
+  assert.match(handler, /listDocumentTypesNames\(\{ throwOnError: true \}\)/);
+  assert.match(handler, /getUsers\(\{ throwOnError: true \}\)/);
+  const paperless = read('services/paperlessService.ts');
+  assert.match(paperless, /if \(throwOnError\) throw error/);
+});
+
+test('global history rescan remains available when the active filter has no matches', () => {
+  const history = read('src/components/history-workspace.tsx');
+  assert.match(history, /setArchiveTotal\(payload\.recordsTotal \|\| 0\)/);
+  assert.match(history, /archiveTotal > 0 \? <button[^>]*>[\s\S]*?Rescan all/);
 });
 
 test('landing metrics stay separate, anonymous and privacy-signal aware', () => {

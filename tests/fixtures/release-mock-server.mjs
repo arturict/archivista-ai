@@ -57,7 +57,13 @@ const server = http.createServer(async (request, response) => {
     return json(response, 200, { paperless_version: 'release-fixture' });
   }
   if (path === '/v1/models' && request.method === 'GET') {
-    return json(response, 200, { object: 'list', data: [{ id: 'release-mock', object: 'model', owned_by: 'tagvico' }] });
+    return json(response, 200, {
+      object: 'list',
+      data: [
+        { id: 'release-mock', object: 'model', owned_by: 'tagvico' },
+        { id: 'text-embedding-release', object: 'model', owned_by: 'tagvico' }
+      ]
+    });
   }
   if (['/v1/chat/completions', '/catalogless/chat/completions'].includes(path) && request.method === 'POST') {
     const body = await readBody(request);

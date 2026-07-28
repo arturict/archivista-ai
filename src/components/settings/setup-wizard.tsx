@@ -65,6 +65,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   const [codexLoginId, setCodexLoginId] = useState('');
   const [codexLoginOutput, setCodexLoginOutput] = useState('');
   const codexPollTimer = useRef<number | null>(null);
+  const providerProbeId = useRef(0);
   const provider = providers.find((candidate) => candidate.instanceId === state.providerId);
   const visibleProviders = useMemo(() => providers.filter((candidate) => candidate.available), [providers]);
 
@@ -133,6 +134,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
 
   const updateProviderValue = (key: string, value: string) => {
     if (state.providerValues[key] === value) return;
+    providerProbeId.current += 1;
     setModels([]);
     setVerifiedModelId('');
     setState((current) => ({
@@ -151,6 +153,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
 
   const updateModelId = (modelId: string) => {
     if (state.modelId === modelId) return;
+    providerProbeId.current += 1;
     setVerifiedModelId('');
     update('modelId', modelId);
     setStatus({
@@ -197,6 +200,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       setStatus({ kind: 'error', message: `Enter ${missing.label.toLowerCase()} before checking the runtime.` });
       return;
     }
+    const probeId = ++providerProbeId.current;
     setVerifiedModelId('');
     setStatus({
       kind: 'loading',
@@ -215,6 +219,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
         })
       });
       const body = await response.json().catch(() => ({}));
+      if (probeId !== providerProbeId.current) return;
       if (!response.ok || body.ok !== true) {
         throw new Error(body.error || 'The AI runtime could not be verified.');
       }
@@ -237,6 +242,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
         });
       }
     } catch (error) {
+      if (probeId !== providerProbeId.current) return;
       setStatus({
         kind: 'error',
         message: error instanceof Error ? error.message : 'The AI runtime could not be verified.'
@@ -270,6 +276,10 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
           stopCodexPolling();
           setCodexLoginId('');
           if (body.error) throw new Error(body.error);
+          providerProbeId.current += 1;
+          setModels([]);
+          setVerifiedModelId('');
+          setState((current) => ({ ...current, modelId: '' }));
           setCodexLoginOutput('ChatGPT sign-in completed. The account token stays in Tagvico data.');
           setStatus({ kind: 'success', message: 'ChatGPT is connected. Check the runtime to load its live models.' });
         }
@@ -285,6 +295,10 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   };
 
   const startCodexLogin = async () => {
+    providerProbeId.current += 1;
+    setModels([]);
+    setVerifiedModelId('');
+    setState((current) => ({ ...current, modelId: '' }));
     setStatus({ kind: 'loading', message: 'Starting secure ChatGPT device sign-in…' });
     try {
       const response = await fetch('/api/setup/v3/codex/login', { method: 'POST' });
@@ -359,6 +373,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   const changeProvider = (providerId: string) => {
     if (state.providerId === 'codex' && codexLoginId) void cancelCodexLogin();
     const nextProvider = providers.find((candidate) => candidate.instanceId === providerId);
+    providerProbeId.current += 1;
     setModels([]);
     setVerifiedModelId('');
     setState((current) => ({
@@ -437,7 +452,12 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       description="Tagvico loads the live catalog when available, accepts an exact model ID when needed, and verifies the selected chat model."
     >
       <SettingsRow title="Provider" description={provider?.description}>
-        <select className="settings-select" value={state.providerId} onChange={(event) => changeProvider(event.target.value)}>
+        <select
+          className="settings-select"
+          value={state.providerId}
+          disabled={status?.kind === 'loading'}
+          onChange={(event) => changeProvider(event.target.value)}
+        >
           {visibleProviders.map((candidate) => <option key={candidate.instanceId} value={candidate.instanceId}>
             {candidate.name}{candidate.recommended ? ' (recommended)' : ''}
           </option>)}
@@ -456,6 +476,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
               type={field.type}
               required={field.required}
               autoComplete={field.secret ? 'new-password' : 'off'}
+              disabled={status?.kind === 'loading'}
               placeholder={field.placeholder}
               value={state.providerValues[field.key] || ''}
               onChange={(event) => updateProviderValue(field.key, event.target.value)}
@@ -501,6 +522,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
             <select
               className="settings-select"
               value={models.some((model) => model.id === state.modelId) ? state.modelId : ''}
+              disabled={status?.kind === 'loading'}
               onChange={(event) => updateModelId(event.target.value)}
             >
               <option value="">Choose a model</option>
@@ -514,6 +536,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
             <input
               className="settings-input"
               value={state.modelId}
+              disabled={status?.kind === 'loading'}
               onChange={(event) => updateModelId(event.target.value)}
               placeholder="Enter the exact chat model ID"
             />

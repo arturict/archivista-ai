@@ -607,7 +607,7 @@ class PaperlessService {
     }
   }
 
-  async listCorrespondentsNames() {
+  async listCorrespondentsNames({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     let allCorrespondents: NamedResource[] = [];
     let page = 1;
@@ -648,11 +648,12 @@ class PaperlessService {
   
     } catch (error) {
       console.error('[ERROR] fetching correspondent names:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }
 
-  async listDocumentTypesNames() {
+  async listDocumentTypesNames({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     let allDocumentTypes: NamedResource[] = [];
     let page = 1;
@@ -689,6 +690,7 @@ class PaperlessService {
   
     } catch (error) {
       console.error('[ERROR] fetching document type names:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }
@@ -1360,7 +1362,7 @@ async getOrCreateDocumentType(name: string) {
     }
   }
 
-  async getUsers() {
+  async getUsers({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     try {
       let users: Record<string, unknown>[] = [];
@@ -1384,6 +1386,7 @@ async getOrCreateDocumentType(name: string) {
       return users;
     } catch (error) {
       console.error('[ERROR] fetching users:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }
