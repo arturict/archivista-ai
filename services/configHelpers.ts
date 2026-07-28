@@ -183,6 +183,7 @@ function normalizeProviderPayload(payload: ConfigLike = {}) {
     provider,
     selectedModel,
     openrouterApiKey: payload.openrouterApiKey || payload.OPENROUTER_API_KEY || payload.openaiKey || payload.OPENAI_API_KEY || '',
+    openrouterBaseUrl: payload.openrouterBaseUrl || payload.OPENROUTER_BASE_URL || '',
     ollamaUrl: payload.ollamaUrl || payload.OLLAMA_API_URL || 'http://localhost:11434',
     ollamaCloudUrl: payload.ollamaCloudUrl || payload.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
     ollamaCloudApiKey: payload.ollamaCloudApiKey || payload.OLLAMA_CLOUD_API_KEY || payload.OLLAMA_API_KEY || '',

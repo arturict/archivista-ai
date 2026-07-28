@@ -59,7 +59,7 @@ const server = http.createServer(async (request, response) => {
   if (path === '/v1/models' && request.method === 'GET') {
     return json(response, 200, { object: 'list', data: [{ id: 'release-mock', object: 'model', owned_by: 'tagvico' }] });
   }
-  if (path === '/v1/chat/completions' && request.method === 'POST') {
+  if (['/v1/chat/completions', '/catalogless/chat/completions'].includes(path) && request.method === 'POST') {
     const body = await readBody(request);
     const requestsProposal = JSON.stringify(body.messages || []).includes('Prepare a follow-up action');
     const requestsDocumentRead = JSON.stringify(body.messages || []).includes('When is the insurance renewal due');

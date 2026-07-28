@@ -58,6 +58,36 @@ assert.equal(providerProbe.body.ok, true);
 assert.ok(providerProbe.body.models.some((model) => model.id === setupPayload.provider.modelId));
 assert.equal(JSON.stringify(providerProbe.body).includes(setupPayload.provider.values.apiKey), false);
 
+const selectedProviderProbe = await responseJson(await request('/api/setup/v3/provider-probe', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    instanceId: setupPayload.provider.instanceId,
+    values: setupPayload.provider.values,
+    modelId: setupPayload.provider.modelId
+  })
+}));
+assert.equal(selectedProviderProbe.response.status, 200, JSON.stringify(selectedProviderProbe.body));
+assert.equal(selectedProviderProbe.body.validatedModelId, setupPayload.provider.modelId);
+assert.equal(selectedProviderProbe.body.validationMode, 'chat');
+
+const cataloglessProviderProbe = await responseJson(await request('/api/setup/v3/provider-probe', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    instanceId: setupPayload.provider.instanceId,
+    values: {
+      ...setupPayload.provider.values,
+      baseUrl: `${mockUrl}/catalogless`
+    },
+    modelId: setupPayload.provider.modelId
+  })
+}));
+assert.equal(cataloglessProviderProbe.response.status, 200, JSON.stringify(cataloglessProviderProbe.body));
+assert.equal(cataloglessProviderProbe.body.validatedModelId, setupPayload.provider.modelId);
+assert.equal(cataloglessProviderProbe.body.validationMode, 'chat');
+assert.deepEqual(cataloglessProviderProbe.body.models.map((model) => model.id), [setupPayload.provider.modelId]);
+
 const setup = await responseJson(await request('/api/setup/v3', { method: 'POST', headers, body: JSON.stringify(setupPayload) }));
 assert.equal(setup.response.status, 200, JSON.stringify(setup.body));
 assert.equal(setup.body.success, true);

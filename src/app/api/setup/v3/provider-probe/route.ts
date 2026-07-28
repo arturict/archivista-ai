@@ -1,15 +1,17 @@
 import { z } from 'zod';
 import { apiError, ApiError, readJsonBody } from '@/lib/server/auth';
 import { assertInitialSetupOpen } from '@/lib/server/initial-setup';
-import { providerInstanceIdSchema } from '@root/contracts/provider';
+import { providerInstanceIdSchema, type ModelDescriptor } from '@root/contracts/provider';
 import providerDiscoveryService from '@root/services/providerDiscoveryService';
+import validateProviderSetupModel from '@root/services/providerSetupValidation';
 
 const providerRegistryModule = require('@root/services/providerRegistry');
 const providerRegistry = providerRegistryModule.default || providerRegistryModule;
 
 const requestSchema = z.object({
   instanceId: providerInstanceIdSchema,
-  values: z.record(z.string().max(4096)).default({})
+  values: z.record(z.string().max(4096)).default({}),
+  modelId: z.string().trim().min(1).max(200).optional()
 }).strict();
 
 function assertSafeUrls(
@@ -52,15 +54,55 @@ export async function POST(request: Request) {
     };
     assertSafeUrls(definition.fields, values);
     const environment = providerRegistry.providerValuesToEnvironment(input.instanceId, values);
-    let models;
+    let models: ModelDescriptor[] = [];
+    let discoveryError: unknown;
     try {
       models = await providerDiscoveryService.discoverProviderModels(input.instanceId, environment);
     } catch (error) {
-      throw new ApiError(400, safeDiscoveryError(error));
+      discoveryError = error;
+    }
+
+    let validatedModelId: string | undefined;
+    if (input.modelId) {
+      if (definition.manualModelInput) {
+        const valid = await validateProviderSetupModel(input.instanceId, values, input.modelId);
+        if (!valid) {
+          throw new ApiError(
+            400,
+            'The selected model could not complete a test request. Check the model ID, credentials, and runtime URL.'
+          );
+        }
+      } else if (!models.some((model) => model.id === input.modelId)) {
+        throw new ApiError(400, 'The selected model is not available to this runtime account.');
+      }
+      validatedModelId = input.modelId;
+      if (!models.some((model) => model.id === input.modelId)) {
+        models = [{
+          id: input.modelId,
+          name: input.modelId,
+          isDefault: true,
+          options: [],
+          capabilities: ['chat']
+        }];
+      }
+    } else if (discoveryError) {
+      const hint = definition.manualModelInput
+        ? ' You can enter a model ID manually and check it directly.'
+        : '';
+      throw new ApiError(400, `${safeDiscoveryError(discoveryError)}${hint}`);
+    } else if (!models.length) {
+      const message = definition.manualModelInput
+        ? 'The runtime returned no models. Enter a model ID manually and check it directly.'
+        : 'The runtime account returned no usable models.';
+      throw new ApiError(400, message);
     }
 
     return Response.json({
       ok: true,
+      ...(validatedModelId ? {
+        validatedModelId,
+        validationMode: definition.manualModelInput ? 'chat' : 'catalog'
+      } : {}),
       models: models.map((model) => ({
         id: model.id,
         name: model.name,

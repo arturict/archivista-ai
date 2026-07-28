@@ -18,7 +18,12 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
     wizard.indexOf('const checkPaperless')
   );
   assert.match(providerInvalidation, /setModels\(\[\]\)/);
+  assert.match(providerInvalidation, /setVerifiedModelId\(''\)/);
   assert.match(providerInvalidation, /modelId: ''/);
+  assert.match(wizard, /validatedModelId/);
+  assert.match(wizard, /Model ID/);
+  assert.match(wizard, /minimal chat request/);
+  assert.doesNotMatch(wizard, /discovered\[0\]\.id/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
@@ -27,6 +32,27 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   assert.doesNotMatch(storedDraft, /\bpassword\b/);
   assert.doesNotMatch(storedDraft, /confirmPassword/);
   assert.match(storedDraft, /providerValues: publicProviderValues/);
+});
+
+test('provider probe validates the selected model and supports catalog-less compatible runtimes', () => {
+  const route = read('src/app/api/setup/v3/provider-probe/route.ts');
+  const validation = read('services/providerSetupValidation.ts');
+  const setupService = read('services/setupService.ts');
+  const setupRoutes = read('routes/setup.ts');
+  const acceptance = read('scripts/release-acceptance.mjs');
+  const fixture = read('tests/fixtures/release-mock-server.mjs');
+
+  assert.match(route, /modelId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\)/);
+  assert.match(route, /validateProviderSetupModel\(input\.instanceId, values, input\.modelId\)/);
+  assert.match(route, /capabilities: \['chat'\]/);
+  assert.match(route, /validatedModelId/);
+  assert.match(validation, /validateCustomConfig\(values\.baseUrl, values\.apiKey, model\)/);
+  assert.match(validation, /validateOpenAIConfig\(values\.apiKey, model\)/);
+  assert.match(setupService, /selectedModel \|\| process\.env\.OPENAI_MODEL/);
+  assert.match(setupRoutes, /validateOpenAIConfig\(\s*providerConfig\.openaiApiKey,\s*providerConfig\.selectedModel/);
+  assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
+  assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
+  assert.match(fixture, /\/catalogless\/chat\/completions/);
 });
 
 test('new setup starts in review mode with scheduled scans paused', () => {

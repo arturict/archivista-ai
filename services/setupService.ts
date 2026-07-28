@@ -85,11 +85,11 @@ class SetupService {
 }
 
 
-  async validateOpenAIConfig(apiKey?: string): Promise<boolean> {
+  async validateOpenAIConfig(apiKey?: string, selectedModel?: string): Promise<boolean> {
     if (apiKey) {
       try {
         const openai = new OpenAI({ apiKey });
-        const model = process.env.OPENAI_MODEL || 'gpt-5.4-nano';
+        const model = selectedModel || process.env.OPENAI_MODEL || 'gpt-5.4-nano';
         const response = await openai.chat.completions.create({
           model,
           messages: [{ role: "user", content: "Reply with the single word: ok" }],
@@ -107,7 +107,11 @@ class SetupService {
     return false;
   }
 
-  async validateOpenRouterConfig(apiKey?: string, model = 'openai/gpt-5.4-nano'): Promise<boolean> {
+  async validateOpenRouterConfig(
+    apiKey?: string,
+    model = 'openai/gpt-5.4-nano',
+    baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
+  ): Promise<boolean> {
     if (!apiKey) {
       return false;
     }
@@ -115,7 +119,7 @@ class SetupService {
     try {
       const openai = new OpenAI({
         apiKey,
-        baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+        baseURL: baseUrl,
         defaultHeaders: {
           'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'https://github.com/arturict/tagvico-ai',
           'X-Title': 'Tagvico AI'
@@ -238,13 +242,14 @@ class SetupService {
     if (aiProvider === 'openrouter') {
       const openRouterValid = await this.validateOpenRouterConfig(
         config.OPENROUTER_API_KEY || config.OPENAI_API_KEY,
-        config.OPENROUTER_MODEL || config.AI_MODEL || 'openai/gpt-5.4-mini'
+        config.OPENROUTER_MODEL || config.AI_MODEL || 'openai/gpt-5.4-mini',
+        config.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
       );
       if (!openRouterValid) {
         throw new Error('Invalid OpenRouter configuration');
       }
     } else if (aiProvider === 'openai') {
-      const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY);
+      const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY, config.OPENAI_MODEL);
       if (!openaiValid) {
         throw new Error('Invalid OpenAI configuration');
       }

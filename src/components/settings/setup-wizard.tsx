@@ -59,6 +59,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   const [state, setState] = useState<SetupState>(() => initialState(providers));
   const [step, setStep] = useState(0);
   const [models, setModels] = useState<SetupModel[]>([]);
+  const [verifiedModelId, setVerifiedModelId] = useState('');
   const [status, setStatus] = useState<SetupStatus>(null);
   const [hydrated, setHydrated] = useState(false);
   const [codexLoginId, setCodexLoginId] = useState('');
@@ -133,6 +134,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
   const updateProviderValue = (key: string, value: string) => {
     if (state.providerValues[key] === value) return;
     setModels([]);
+    setVerifiedModelId('');
     setState((current) => ({
       ...current,
       modelId: '',
@@ -144,6 +146,18 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     setStatus({
       kind: 'neutral',
       message: 'Connection details changed. Check the runtime again before continuing.'
+    });
+  };
+
+  const updateModelId = (modelId: string) => {
+    if (state.modelId === modelId) return;
+    setVerifiedModelId('');
+    update('modelId', modelId);
+    setStatus({
+      kind: 'neutral',
+      message: modelId
+        ? 'Model changed. Check the runtime again to verify this exact model.'
+        : 'Choose or enter a model, then check the runtime.'
     });
   };
 
@@ -183,14 +197,21 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       setStatus({ kind: 'error', message: `Enter ${missing.label.toLowerCase()} before checking the runtime.` });
       return;
     }
-    setStatus({ kind: 'loading', message: 'Checking the runtime and loading its model catalog…' });
+    setVerifiedModelId('');
+    setStatus({
+      kind: 'loading',
+      message: state.modelId.trim()
+        ? 'Checking the runtime and verifying the selected chat model…'
+        : 'Checking the runtime and loading its model catalog…'
+    });
     try {
       const response = await fetch('/api/setup/v3/provider-probe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instanceId: state.providerId,
-          values: state.providerValues
+          values: state.providerValues,
+          ...(state.modelId.trim() ? { modelId: state.modelId.trim() } : {})
         })
       });
       const body = await response.json().catch(() => ({}));
@@ -198,18 +219,23 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
         throw new Error(body.error || 'The AI runtime could not be verified.');
       }
       const discovered = Array.isArray(body.models) ? body.models as SetupModel[] : [];
-      if (!discovered.length) throw new Error('The runtime connected, but returned no usable models.');
       setModels(discovered);
-      setState((current) => ({
-        ...current,
-        modelId: discovered.some((model) => model.id === current.modelId)
-          ? current.modelId
-          : discovered.find((model) => model.isDefault)?.id || discovered[0].id
-      }));
-      setStatus({
-        kind: 'success',
-        message: `Runtime connected. Choose from ${discovered.length} verified model${discovered.length === 1 ? '' : 's'}, then continue.`
-      });
+      const validatedModelId = typeof body.validatedModelId === 'string' ? body.validatedModelId : '';
+      setVerifiedModelId(validatedModelId);
+      if (validatedModelId) {
+        setState((current) => ({ ...current, modelId: validatedModelId }));
+        setStatus({
+          kind: 'success',
+          message: body.validationMode === 'chat'
+            ? 'Runtime and selected chat model verified with a test response. You can continue.'
+            : 'Runtime account and selected model verified in its live catalog. You can continue.'
+        });
+      } else {
+        setStatus({
+          kind: 'neutral',
+          message: `Runtime connected. Choose from ${discovered.length} model${discovered.length === 1 ? '' : 's'}, then check that model.`
+        });
+      }
     } catch (error) {
       setStatus({
         kind: 'error',
@@ -334,6 +360,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     if (state.providerId === 'codex' && codexLoginId) void cancelCodexLogin();
     const nextProvider = providers.find((candidate) => candidate.instanceId === providerId);
     setModels([]);
+    setVerifiedModelId('');
     setState((current) => ({
       ...current,
       providerId,
@@ -407,7 +434,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
 
     {step === 1 ? <SettingsSection
       title="2. Choose an AI runtime"
-      description="Tagvico checks the connection and loads the live model catalog so you do not have to guess a model ID."
+      description="Tagvico loads the live catalog when available, accepts an exact model ID when needed, and verifies the selected chat model."
     >
       <SettingsRow title="Provider" description={provider?.description}>
         <select className="settings-select" value={state.providerId} onChange={(event) => changeProvider(event.target.value)}>
@@ -465,17 +492,37 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       </SettingsRow> : null}
       <SettingsRow
         title="Model"
-        description="The verified model catalog appears after the connection check. Curated suggestions remain hints, not availability claims."
+        description="Catalog entries prove availability only. Tagvico verifies the exact selected model with a minimal chat request before continuing."
+        stack
       >
-        {models.length ? <select
-          className="settings-select"
-          value={state.modelId}
-          onChange={(event) => update('modelId', event.target.value)}
-        >
-          {models.map((model) => <option key={model.id} value={model.id}>
-            {model.name}{model.isDefault ? ' (runtime default)' : ''}
-          </option>)}
-        </select> : <p className="settings-field-help">Check the runtime to load models it currently exposes.</p>}
+        <div className="settings-fields-grid">
+          {models.length ? <label className="settings-field">
+            <span className="settings-field-label">Live model catalog</span>
+            <select
+              className="settings-select"
+              value={models.some((model) => model.id === state.modelId) ? state.modelId : ''}
+              onChange={(event) => updateModelId(event.target.value)}
+            >
+              <option value="">Choose a model</option>
+              {models.map((model) => <option key={model.id} value={model.id}>
+                {model.name}{model.isDefault ? ' (runtime default)' : ''}
+              </option>)}
+            </select>
+          </label> : null}
+          {provider?.manualModelInput ? <label className="settings-field">
+            <span className="settings-field-label">Model ID</span>
+            <input
+              className="settings-input"
+              value={state.modelId}
+              onChange={(event) => updateModelId(event.target.value)}
+              placeholder="Enter the exact chat model ID"
+            />
+            <span className="settings-field-help">Use this when the runtime has no model catalog or when you need a custom ID.</span>
+          </label> : null}
+          {!models.length && !provider?.manualModelInput
+            ? <p className="settings-field-help">Check the runtime to load models it currently exposes.</p>
+            : null}
+        </div>
       </SettingsRow>
     </SettingsSection> : null}
 
@@ -528,9 +575,15 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
           className="settings-button is-primary"
           type="button"
           disabled={status?.kind === 'loading'}
-          onClick={() => models.length && state.modelId ? (setStep(2), setStatus(null)) : void checkProvider()}
+          onClick={() => verifiedModelId === state.modelId.trim() && state.modelId.trim()
+            ? (setStep(2), setStatus(null))
+            : void checkProvider()}
         >
-          {status?.kind === 'loading' ? 'Checking…' : models.length ? 'Continue' : 'Check runtime'}
+          {status?.kind === 'loading'
+            ? 'Checking…'
+            : verifiedModelId === state.modelId.trim() && state.modelId.trim()
+              ? 'Continue'
+              : 'Check runtime'}
         </button> : null}
         {step === 2 ? <button className="settings-button is-primary" type="submit" disabled={status?.kind === 'loading'}>
           {status?.kind === 'loading' ? 'Creating…' : 'Create owner account'}

@@ -2052,7 +2052,7 @@ function buildConfigForSave(payload: Record<string, RequestValue>, options: Save
     USE_EXISTING_DATA: parseBooleanFlag(payload.useExistingData, currentConfig.USE_EXISTING_DATA || 'no'),
     DISABLE_AUTOMATIC_PROCESSING: parseBooleanFlag(payload.disableAutomaticProcessing, currentConfig.DISABLE_AUTOMATIC_PROCESSING || 'no'),
     OPENROUTER_API_KEY: providerPayload.openrouterApiKey || currentConfig.OPENROUTER_API_KEY || '',
-    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || providerPayload.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
     OPENROUTER_MODEL: providerPayload.provider === 'openrouter' ? providerPayload.selectedModel : currentConfig.OPENROUTER_MODEL || providerPayload.selectedModel,
     OPENAI_API_KEY: providerPayload.provider === 'openai' ? providerPayload.openaiApiKey : currentConfig.OPENAI_API_KEY || '',
     OPENAI_MODEL: providerPayload.provider === 'openai' ? providerPayload.selectedModel : currentConfig.OPENAI_MODEL || 'gpt-5.4-mini',
@@ -4064,7 +4064,8 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     if (providerConfig.provider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
         providerConfig.openrouterApiKey,
-        providerConfig.selectedModel
+        providerConfig.selectedModel,
+        process.env.OPENROUTER_BASE_URL || providerConfig.openrouterBaseUrl || undefined
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4072,10 +4073,13 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
         });
       }
     } else if (providerConfig.provider === 'openai') {
-      const isValid = await setupService.validateOpenAIConfig(providerConfig.openaiApiKey);
+      const isValid = await setupService.validateOpenAIConfig(
+        providerConfig.openaiApiKey,
+        providerConfig.selectedModel
+      );
       if (!isValid) {
         return res.status(400).json({
-          error: 'OpenAI API key is not valid. Please check the key.'
+          error: 'OpenAI connection failed. Please check the API key and selected model.'
         });
       }
     } else if (providerConfig.provider === 'ollama') {
@@ -4441,7 +4445,8 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
     if (providerConfig.provider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
         providerConfig.openrouterApiKey,
-        providerConfig.selectedModel
+        providerConfig.selectedModel,
+        process.env.OPENROUTER_BASE_URL || providerConfig.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || undefined
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4449,10 +4454,13 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
         });
       }
     } else if (providerConfig.provider === 'openai' && providerConfig.openaiApiKey) {
-      const isValid = await setupService.validateOpenAIConfig(providerConfig.openaiApiKey);
+      const isValid = await setupService.validateOpenAIConfig(
+        providerConfig.openaiApiKey,
+        providerConfig.selectedModel || currentConfig.OPENAI_MODEL
+      );
       if (!isValid) {
         return res.status(400).json({
-          error: 'OpenAI API key is not valid. Please check the key.'
+          error: 'OpenAI connection failed. Please check the API key and selected model.'
         });
       }
     } else if (providerConfig.provider === 'ollama') {
