@@ -39,6 +39,9 @@ library totals, including `doc://countdocuments`, use an exact count, and
 document content is read only when the question requires it. Internal tool
 markers are never shown as document citations. Each research card can reveal the safe search term,
 matching document IDs, titles, dates, and result count without exposing OCR.
+Matching source titles link directly to their Paperless-backed document view,
+so the answer can be checked against the permitted original without repeating
+the search.
 The right-hand research trail remains visible while tools run and groups safe
 research evidence with any pending approvals. Conversations can be created,
 searched, renamed, switched, and deleted from the chat workspace.
@@ -171,6 +174,12 @@ without a second legacy UI.
 Provider configuration is generated from the central provider registry. The
 model picker supports runtime discovery, search, provider grouping, local
 favorites, capability badges, and keyboard-native controls.
+
+New installations verify Paperless access and the selected runtime before
+saving configuration. Built-in endpoints are prefilled, models come from the
+runtime's live catalog, and the final summary makes the safe starting state
+explicit: review-first writes and paused scheduled scans. Non-secret progress
+can resume within the same tab without persisting tokens or passwords.
 
 ![Tagvico v3.2 AI model settings with the provider registry and write-only credential boundary](/screenshots/ai-models-paper-pine-v3.png)
 

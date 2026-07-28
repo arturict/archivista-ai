@@ -1,28 +1,23 @@
 import { apiError, ApiError, requireApiUser } from '@/lib/server/auth';
+import { manualBackendRequest } from '@/lib/server/manual-backend';
 import { workspaceFor } from '@/lib/server/workspace';
-
-// This CommonJS service is bundled into the Next server route.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const paperlessService = require('../../../../../services/paperlessService') as {
-  listCorrespondentsNames(): Promise<Array<{ id?: number; name?: string }>>;
-  listDocumentTypesNames(): Promise<Array<{ id?: number; name?: string }>>;
-  getUsers(): Promise<Array<{ id?: number; username?: string }>>;
-};
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireApiUser();
-    const [correspondents, documentTypes, users] = await Promise.all([
-      paperlessService.listCorrespondentsNames(),
-      paperlessService.listDocumentTypesNames(),
-      paperlessService.getUsers()
-    ]);
+    const response = await manualBackendRequest(request, '/manual/options');
+    if (!response.ok) return response;
+    const options = await response.json() as {
+      correspondents?: Array<{ id?: number; name?: string }>;
+      documentTypes?: Array<{ id?: number; name?: string }>;
+      users?: Array<{ id?: number; username?: string }>;
+    };
     return Response.json({
-      correspondents: correspondents.map(({ id, name }) => ({ id, name })),
-      documentTypes: documentTypes.map(({ id, name }) => ({ id, name })),
-      users: users.map(({ id, username }) => ({ id, username })),
+      correspondents: options.correspondents || [],
+      documentTypes: options.documentTypes || [],
+      users: options.users || [],
       canMutate: workspaceFor(user).role !== 'viewer'
     });
   } catch (error) {

@@ -42,6 +42,20 @@ test('key-based providers expose write-only credentials and branded providers us
   assert.equal(definitions.find((candidate) => candidate.id === 'compatible').icon, null);
 });
 
+test('standard provider endpoints are safe prefilled defaults instead of required blank fields', () => {
+  const definitions = registry.getProviderDefinitions();
+  const defaults = Object.fromEntries(definitions.map((definition) => [
+    definition.id,
+    definition.fields.find((field) => field.key === 'baseUrl')?.defaultValue
+      || definition.fields.find((field) => field.key === 'url')?.defaultValue
+      || null
+  ]));
+  assert.equal(defaults.openrouter, 'https://openrouter.ai/api/v1');
+  assert.equal(defaults.ollama, 'http://localhost:11434');
+  assert.equal(defaults['ollama-cloud'], 'https://ollama.com');
+  assert.equal(defaults.opencode, 'https://opencode.ai/zen/go/v1');
+});
+
 test('unknown provider instances are preserved as unavailable instead of silently masquerading as a known provider', () => {
   assert.equal(registry.getProviderDefinition('future-private-runtime'), null);
 });

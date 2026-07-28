@@ -94,3 +94,21 @@ Self-hosted distributors may override `TAGVICO_TELEMETRY_ENDPOINT`; it must use
 HTTPS. The complete policy and receiver source are available in
 [`PRIVACY_POLICY.md`](https://github.com/arturict/tagvico-ai/blob/main/PRIVACY_POLICY.md)
 and [`telemetry/`](https://github.com/arturict/tagvico-ai/tree/main/telemetry).
+
+## Public website counter
+
+The project landing page uses a separate first-party aggregate page-view
+counter. It does not set cookies, use local storage, create visitor or session
+identifiers, fingerprint browsers, send a referrer, or build a cross-site
+profile. It increments one UTC-day total. Those totals expire after 93 days and
+represent requests, not unique people.
+
+The browser skips the request when Global Privacy Control or Do Not Track is
+enabled. Delivery infrastructure still processes the network address while
+routing a request, so the receiver must run with request logs disabled or
+minimized. The project publishes landing views separately from opted-in active
+installations and suppresses exact installation totals below five.
+
+This narrow design and the project's current Swiss/EU notice and consent
+assessment are documented in
+[`telemetry/PRIVACY_ASSESSMENT.md`](https://github.com/arturict/tagvico-ai/blob/main/telemetry/PRIVACY_ASSESSMENT.md).

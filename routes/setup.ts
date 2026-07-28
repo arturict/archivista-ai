@@ -2323,6 +2323,20 @@ router.get('/manual', (_req: Req, res: Res) => {
   res.status(410).json({ error: 'Legacy manual UI retired. Use the Next.js /automation/manual page.' });
 });
 
+router.get('/manual/options', async (_req: Req, res: Res) => {
+  const [correspondents, documentTypes, users] = await Promise.all([
+    paperlessService.listCorrespondentsNames(),
+    paperlessService.listDocumentTypesNames(),
+    paperlessService.getUsers()
+  ]);
+
+  res.json({
+    correspondents: correspondents.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+    documentTypes: documentTypes.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+    users: users.map(({ id, username }: { id?: number; username?: string }) => ({ id, username }))
+  });
+});
+
 /**
  * @swagger
  * /manual/tags:

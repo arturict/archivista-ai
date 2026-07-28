@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
@@ -205,8 +206,8 @@ export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'd
       <div className="workspace-actions">
         <button className="button" type="button" onClick={() => void validateHistory()}><ShieldCheck /> Validate history</button>
         {orphanCount ? <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'cleanup', count: orphanCount })}><Trash2 /> Clean up {orphanCount}</button> : null}
-        <button className="button" type="button" onClick={() => void rescanSelected()}><RefreshCcw /> Rescan selected</button>
-        <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'rescanAll' })}><RotateCcw /> Rescan all</button>
+        {total > 0 ? <button className="button" type="button" onClick={() => void rescanSelected()}><RefreshCcw /> Rescan selected</button> : null}
+        {total > 0 ? <button className="button danger" type="button" onClick={() => setConfirm({ kind: 'rescanAll' })}><RotateCcw /> Rescan all</button> : null}
       </div>
     </header>
 
@@ -251,7 +252,22 @@ export function HistoryWorkspace({ view = 'activity' }: { view?: 'activity' | 'd
             </div></td>
           </tr>)}</tbody>
         </table>
-      </div> : loadState === 'ready' ? <div className="empty"><h2>No matching records</h2><p>Try another filter or run document automation first.</p></div> : null}
+      </div> : loadState === 'ready' ? <div className="empty">
+        <h2>{search || tag || correspondent
+          ? 'No matching records'
+          : view === 'documents'
+            ? 'No processed documents yet'
+            : 'No activity yet'}</h2>
+        <p>{search || tag || correspondent
+          ? 'Try another title, tag or correspondent.'
+          : view === 'documents'
+            ? 'Ask Tagvico can search your live Paperless archive immediately. Documents appear here after a review-first or manual analysis.'
+            : 'Paperless remains unchanged until you run an analysis and approve its suggestion.'}</p>
+        {!search && !tag && !correspondent ? <div className="workspace-actions">
+          <Link className="button primary" href="/companion">Ask Tagvico</Link>
+          <Link className="button" href="/automation/manual">Analyze one document</Link>
+        </div> : null}
+      </div> : null}
       {loadState === 'ready' ? <footer className="workspace-pagination">
         <button className="button" type="button" disabled={page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))}><ChevronLeft /> Previous</button>
         <span>{page * pageSize + (rows.length ? 1 : 0)}–{Math.min(total, (page + 1) * pageSize)} of {total}</span>

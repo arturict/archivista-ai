@@ -40,6 +40,10 @@ test('manual API reads authenticate and mutations enforce same-origin role check
   ]) {
     assert.match(source(route), /requireApiUser\(\)/, route);
   }
+  const options = source('src/app/api/manual/options/route.ts');
+  assert.match(options, /manualBackendRequest\(request,\s*['"]\/manual\/options['"]\)/);
+  assert.match(options, /canMutate:\s*workspaceFor\(user\)\.role !== ['"]viewer['"]/);
+  assert.match(source('routes/setup.ts'), /router\.get\(['"]\/manual\/options['"]/);
 
   for (const route of [
     'src/app/api/manual/analyze/route.ts',
@@ -61,6 +65,7 @@ test('manual workspace only uses guarded Next APIs and respects read-only roles'
   assert.match(workspace, /['"]\/api\/manual\/update-document['"]/);
   assert.doesNotMatch(workspace, /['"]\/manual\/(documents|analyze|updateDocument)/);
   assert.match(workspace, /disabled=\{options\.canMutate !== true \|\| !previewReady/);
+  assert.match(workspace, /!content\.trim\(\)/);
   assert.match(workspace, /options\.documentTypes\.find/);
   assert.match(workspace, /requestId !== previewRequest\.current/);
 });

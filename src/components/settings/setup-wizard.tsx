@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, FileStack, KeyRound, Sparkles } from 'lucide-react';
 import { InlineStatus } from './inline-status';
@@ -19,33 +19,189 @@ type SetupState = {
   confirmPassword: string;
 };
 
-export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) {
-  const router = useRouter();
-  const [state, setState] = useState<SetupState>({
+type SetupStatus = {
+  kind: 'loading' | 'error' | 'success' | 'neutral';
+  message: string;
+} | null;
+
+type SetupModel = {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  capabilities?: string[];
+};
+
+const DRAFT_KEY = 'tagvicoSetupDraftV3';
+
+function providerDefaults(provider: ProviderDescriptor | undefined) {
+  return Object.fromEntries((provider?.fields || []).flatMap((field) => (
+    field.defaultValue ? [[field.key, field.defaultValue]] : []
+  )));
+}
+
+function initialState(providers: ProviderDescriptor[]): SetupState {
+  const provider = providers.find((candidate) => candidate.recommended) || providers[0];
+  return {
     paperlessUrl: '',
     paperlessToken: '',
-    paperlessUsername: 'admin',
-    providerId: providers.find((provider) => provider.recommended)?.instanceId || providers[0]?.instanceId || 'openrouter',
+    paperlessUsername: '',
+    providerId: provider?.instanceId || 'openrouter',
     modelId: '',
-    providerValues: {},
+    providerValues: providerDefaults(provider),
     username: 'admin',
     password: '',
     confirmPassword: ''
-  });
-  const [status, setStatus] = useState<{ kind: 'loading' | 'error' | 'success'; message: string } | null>(null);
+  };
+}
+
+export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) {
+  const router = useRouter();
+  const [state, setState] = useState<SetupState>(() => initialState(providers));
+  const [step, setStep] = useState(0);
+  const [models, setModels] = useState<SetupModel[]>([]);
+  const [status, setStatus] = useState<SetupStatus>(null);
+  const [hydrated, setHydrated] = useState(false);
   const provider = providers.find((candidate) => candidate.instanceId === state.providerId);
+  const visibleProviders = useMemo(() => providers.filter((candidate) => candidate.available), [providers]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(DRAFT_KEY) || '{}') as Partial<SetupState>;
+      const savedProvider = providers.find((candidate) => candidate.instanceId === saved.providerId)
+        || providers.find((candidate) => candidate.recommended)
+        || providers[0];
+      if (Object.keys(saved).length) {
+        setState((current) => ({
+          ...current,
+          paperlessUrl: String(saved.paperlessUrl || ''),
+          paperlessUsername: String(saved.paperlessUsername || ''),
+          providerId: savedProvider?.instanceId || current.providerId,
+          modelId: String(saved.modelId || ''),
+          providerValues: {
+            ...providerDefaults(savedProvider),
+            ...(saved.providerValues && typeof saved.providerValues === 'object' ? saved.providerValues : {})
+          },
+          username: String(saved.username || current.username)
+        }));
+        setStatus({
+          kind: 'neutral',
+          message: 'Restored non-secret fields for this tab. Re-enter tokens and passwords before continuing.'
+        });
+      }
+    } catch {
+      window.sessionStorage.removeItem(DRAFT_KEY);
+    } finally {
+      setHydrated(true);
+    }
+  }, [providers]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const publicProviderValues = Object.fromEntries(
+      Object.entries(state.providerValues).filter(([key]) => !provider?.fields.find((field) => field.key === key)?.secret)
+    );
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+      paperlessUrl: state.paperlessUrl,
+      paperlessUsername: state.paperlessUsername,
+      providerId: state.providerId,
+      modelId: state.modelId,
+      providerValues: publicProviderValues,
+      username: state.username
+    }));
+  }, [
+    hydrated,
+    provider,
+    state.modelId,
+    state.paperlessUrl,
+    state.paperlessUsername,
+    state.providerId,
+    state.providerValues,
+    state.username
+  ]);
 
   const update = (key: keyof SetupState, value: string | Record<string, string>) => {
     setState((current) => ({ ...current, [key]: value }));
   };
 
+  const checkPaperless = async () => {
+    if (!state.paperlessUrl.trim() || !state.paperlessToken.trim()) {
+      setStatus({ kind: 'error', message: 'Enter the Paperless base URL and an API token first.' });
+      return;
+    }
+    setStatus({ kind: 'loading', message: 'Checking Paperless access and required read permissions…' });
+    try {
+      const response = await fetch('/api/paperless/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: state.paperlessUrl, token: state.paperlessToken })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body.success !== true) {
+        throw new Error(body.instance?.error || body.error || 'Paperless could not be verified.');
+      }
+      setStep(1);
+      setStatus({ kind: 'success', message: 'Paperless is reachable and the token has the required read permissions.' });
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Paperless could not be verified.'
+      });
+    }
+  };
+
+  const checkProvider = async () => {
+    if (!provider) {
+      setStatus({ kind: 'error', message: 'Choose an available AI runtime.' });
+      return;
+    }
+    const missing = provider.fields.find((field) => field.required && !state.providerValues[field.key]?.trim());
+    if (missing) {
+      setStatus({ kind: 'error', message: `Enter ${missing.label.toLowerCase()} before checking the runtime.` });
+      return;
+    }
+    setStatus({ kind: 'loading', message: 'Checking the runtime and loading its model catalog…' });
+    try {
+      const response = await fetch('/api/setup/v3/provider-probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instanceId: state.providerId,
+          values: state.providerValues
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body.ok !== true) {
+        throw new Error(body.error || 'The AI runtime could not be verified.');
+      }
+      const discovered = Array.isArray(body.models) ? body.models as SetupModel[] : [];
+      if (!discovered.length) throw new Error('The runtime connected, but returned no usable models.');
+      setModels(discovered);
+      setState((current) => ({
+        ...current,
+        modelId: discovered.some((model) => model.id === current.modelId)
+          ? current.modelId
+          : discovered.find((model) => model.isDefault)?.id || discovered[0].id
+      }));
+      setStatus({
+        kind: 'success',
+        message: `Runtime connected. Choose from ${discovered.length} verified model${discovered.length === 1 ? '' : 's'}, then continue.`
+      });
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'The AI runtime could not be verified.'
+      });
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (step < 2) return;
     if (state.password !== state.confirmPassword) {
       setStatus({ kind: 'error', message: 'Passwords do not match.' });
       return;
     }
-    setStatus({ kind: 'loading', message: 'Validating Paperless, provider and account…' });
+    setStatus({ kind: 'loading', message: 'Creating the owner account and saving the verified connections…' });
     try {
       const response = await fetch('/api/setup/v3', {
         method: 'POST',
@@ -70,6 +226,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Setup could not be completed.');
+      window.sessionStorage.removeItem(DRAFT_KEY);
       setStatus({ kind: 'success', message: 'Setup complete. Opening sign in…' });
       router.push('/login?setup=success');
       router.refresh();
@@ -78,51 +235,96 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     }
   };
 
+  const changeProvider = (providerId: string) => {
+    const nextProvider = providers.find((candidate) => candidate.instanceId === providerId);
+    setModels([]);
+    setState((current) => ({
+      ...current,
+      providerId,
+      modelId: '',
+      providerValues: providerDefaults(nextProvider)
+    }));
+    setStatus(null);
+  };
+
   return <form className="setup-wizard" onSubmit={submit}>
     <div className="setup-progress" aria-label="Setup steps">
-      <span><FileStack aria-hidden="true" /> Paperless</span>
-      <span><Sparkles aria-hidden="true" /> AI runtime</span>
-      <span><KeyRound aria-hidden="true" /> Owner account</span>
-      <span><Check aria-hidden="true" /> Validate</span>
+      {[
+        { label: 'Paperless', Icon: FileStack },
+        { label: 'AI runtime', Icon: Sparkles },
+        { label: 'Owner & safety', Icon: KeyRound }
+      ].map(({ label, Icon }, index) => <span
+        key={label}
+        className={index === step ? 'is-active' : index < step ? 'is-complete' : undefined}
+        aria-current={index === step ? 'step' : undefined}
+      >
+        {index < step ? <Check aria-hidden="true" /> : <Icon aria-hidden="true" />}
+        {label}
+      </span>)}
     </div>
 
-    <SettingsSection title="1. Connect Paperless-ngx" description="Tagvico verifies the URL, token and required Paperless permissions before saving.">
-      <SettingsRow title="Paperless connection" description="Use the base URL without /api. The token is never echoed back." stack>
+    {step === 0 ? <SettingsSection
+      title="1. Connect Paperless-ngx"
+      description="Tagvico checks the URL, token and required read permissions now, before anything is saved."
+    >
+      <SettingsRow
+        title="Paperless connection"
+        description="Use the base URL without /api. The token stays in this request and is never echoed back."
+        stack
+      >
         <div className="settings-fields-grid">
           <label className="settings-field">
             <span className="settings-field-label">Base URL</span>
-            <input className="settings-input" type="url" required value={state.paperlessUrl} onChange={(event) => update('paperlessUrl', event.target.value)} placeholder="http://paperless:8000" />
-          </label>
-          <label className="settings-field">
-            <span className="settings-field-label">Paperless username</span>
-            <input className="settings-input" value={state.paperlessUsername} onChange={(event) => update('paperlessUsername', event.target.value)} />
+            <input
+              className="settings-input"
+              type="url"
+              required
+              value={state.paperlessUrl}
+              onChange={(event) => update('paperlessUrl', event.target.value)}
+              placeholder="http://paperless:8000"
+            />
           </label>
           <label className="settings-field">
             <span className="settings-field-label">API token</span>
-            <input className="settings-input" type="password" autoComplete="new-password" required value={state.paperlessToken} onChange={(event) => update('paperlessToken', event.target.value)} />
+            <input
+              className="settings-input"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={state.paperlessToken}
+              onChange={(event) => update('paperlessToken', event.target.value)}
+            />
+            <span className="settings-field-help">Create this in Paperless under My Profile. Tagvico verifies document and metadata access.</span>
+          </label>
+          <label className="settings-field">
+            <span className="settings-field-label">Paperless username <small>(optional)</small></span>
+            <input
+              className="settings-input"
+              value={state.paperlessUsername}
+              onChange={(event) => update('paperlessUsername', event.target.value)}
+              placeholder="Only needed for owner assignment"
+            />
           </label>
         </div>
       </SettingsRow>
-    </SettingsSection>
+    </SettingsSection> : null}
 
-    <SettingsSection title="2. Choose an AI runtime" description="Provider fields use the same registry and schema metadata as the authenticated settings page.">
+    {step === 1 ? <SettingsSection
+      title="2. Choose an AI runtime"
+      description="Tagvico checks the connection and loads the live model catalog so you do not have to guess a model ID."
+    >
       <SettingsRow title="Provider" description={provider?.description}>
-        <select
-          className="settings-select"
-          value={state.providerId}
-          onChange={(event) => setState((current) => ({
-            ...current,
-            providerId: event.target.value,
-            modelId: '',
-            providerValues: {}
-          }))}
-        >
-          {providers.filter((candidate) => candidate.available).map((candidate) => <option key={candidate.instanceId} value={candidate.instanceId}>
-            {candidate.name}{candidate.recommended ? ' — recommended' : ''}
+        <select className="settings-select" value={state.providerId} onChange={(event) => changeProvider(event.target.value)}>
+          {visibleProviders.map((candidate) => <option key={candidate.instanceId} value={candidate.instanceId}>
+            {candidate.name}{candidate.recommended ? ' (recommended)' : ''}
           </option>)}
         </select>
       </SettingsRow>
-      {provider?.fields.length ? <SettingsRow title="Connection" description="Secrets remain in the submitted request and are stored only in Tagvico data." stack>
+      {provider?.fields.length ? <SettingsRow
+        title="Connection"
+        description="Built-in endpoint defaults are prefilled. Secrets are stored only in Tagvico data."
+        stack
+      >
         <div className="settings-fields-grid">
           {provider.fields.map((field) => <label className="settings-field" key={field.key}>
             <span className="settings-field-label">{field.label}</span>
@@ -143,23 +345,33 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
         </div>
       </SettingsRow> : null}
       <SettingsRow
-        title="Model ID"
-        description={provider?.manualModelInput
-          ? 'Enter the provider model ID. You can switch to the live model picker after signing in.'
-          : 'The runtime will load the account model catalog after setup.'}
+        title="Model"
+        description="The verified model catalog appears after the connection check. Curated suggestions remain hints, not availability claims."
       >
-        <input
-          className="settings-input"
+        {models.length ? <select
+          className="settings-select"
           value={state.modelId}
-          required={Boolean(provider?.manualModelInput)}
-          disabled={!provider?.manualModelInput}
           onChange={(event) => update('modelId', event.target.value)}
-          placeholder={provider?.manualModelInput ? 'provider/model-id' : 'Loaded after authentication'}
-        />
+        >
+          {models.map((model) => <option key={model.id} value={model.id}>
+            {model.name}{model.isDefault ? ' (runtime default)' : ''}
+          </option>)}
+        </select> : <p className="settings-field-help">Check the runtime to load models it currently exposes.</p>}
       </SettingsRow>
-    </SettingsSection>
+    </SettingsSection> : null}
 
-    <SettingsSection title="3. Create the owner account" description="This local account controls installation settings and household administration.">
+    {step === 2 ? <SettingsSection
+      title="3. Create the owner account"
+      description="The safe starting point is review-first with scheduled automation paused. Ask Tagvico stays read-only until you approve a proposed change."
+    >
+      <SettingsRow title="Verified setup" description="Review the non-secret summary before creating the local account." stack>
+        <dl className="setup-review">
+          <div><dt>Paperless</dt><dd>{state.paperlessUrl}</dd></div>
+          <div><dt>Runtime</dt><dd>{provider?.name || state.providerId}</dd></div>
+          <div><dt>Model</dt><dd>{models.find((model) => model.id === state.modelId)?.name || state.modelId}</dd></div>
+          <div><dt>Write safety</dt><dd>Review first, scheduled scans paused</dd></div>
+        </dl>
+      </SettingsRow>
       <SettingsRow title="Owner credentials" stack>
         <div className="settings-fields-grid">
           <label className="settings-field">
@@ -176,11 +388,34 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
           </label>
         </div>
       </SettingsRow>
-    </SettingsSection>
+    </SettingsSection> : null}
 
     <div className="setup-submit">
-      {status ? <InlineStatus kind={status.kind}>{status.message}</InlineStatus> : <p>Nothing is written until validation succeeds.</p>}
-      <button className="settings-button is-primary" type="submit" disabled={status?.kind === 'loading'}>Complete setup</button>
+      <div>
+        {status ? <InlineStatus kind={status.kind}>{status.message}</InlineStatus> : <p>
+          Secret fields are never saved in the browser. Non-secret progress is kept only in this tab.
+        </p>}
+      </div>
+      <div className="setup-submit-actions">
+        {step > 0 ? <button className="settings-button" type="button" disabled={status?.kind === 'loading'} onClick={() => {
+          setStep((current) => Math.max(0, current - 1));
+          setStatus(null);
+        }}>Back</button> : null}
+        {step === 0 ? <button className="settings-button is-primary" type="button" disabled={status?.kind === 'loading'} onClick={() => void checkPaperless()}>
+          {status?.kind === 'loading' ? 'Checking…' : 'Check Paperless'}
+        </button> : null}
+        {step === 1 ? <button
+          className="settings-button is-primary"
+          type="button"
+          disabled={status?.kind === 'loading'}
+          onClick={() => models.length && state.modelId ? (setStep(2), setStatus(null)) : void checkProvider()}
+        >
+          {status?.kind === 'loading' ? 'Checking…' : models.length ? 'Continue' : 'Check runtime'}
+        </button> : null}
+        {step === 2 ? <button className="settings-button is-primary" type="submit" disabled={status?.kind === 'loading'}>
+          {status?.kind === 'loading' ? 'Creating…' : 'Create owner account'}
+        </button> : null}
+      </div>
     </div>
   </form>;
 }

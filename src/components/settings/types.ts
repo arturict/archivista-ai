@@ -42,6 +42,7 @@ export type ProviderDescriptor = {
     type: 'text' | 'password' | 'url';
     required: boolean;
     placeholder?: string;
+    defaultValue?: string;
     secret: boolean;
   }>;
   configuration: Record<string, string | { configured: boolean }>;

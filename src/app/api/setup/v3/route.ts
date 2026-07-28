@@ -1,5 +1,5 @@
 import { setupV3Schema } from '@root/contracts/provider';
-import { assertSameOrigin, apiError, readJsonBody } from '@/lib/server/auth';
+import { assertSameOrigin, apiError, ApiError, readJsonBody } from '@/lib/server/auth';
 
 const providerRegistryModule = require('@root/services/providerRegistry');
 const providerRegistry = providerRegistryModule.default || providerRegistryModule;
@@ -17,9 +17,23 @@ export async function POST(request: Request) {
     if (!definition) {
       return Response.json({ error: `Provider "${input.provider.instanceId}" is unavailable.` }, { status: 400 });
     }
+    const providerValues = {
+      ...Object.fromEntries(definition.fields.flatMap((field: { key: string; defaultValue?: string }) => (
+        field.defaultValue ? [[field.key, field.defaultValue]] : []
+      ))),
+      ...input.provider.values
+    };
+    for (const field of definition.fields.filter((candidate: { type: string }) => candidate.type === 'url')) {
+      const value = providerValues[field.key];
+      if (!value) continue;
+      const url = new URL(value);
+      if (url.username || url.password) {
+        throw new ApiError(400, `${field.key} must not contain embedded credentials.`);
+      }
+    }
     const providerEnvironment = providerRegistry.providerValuesToEnvironment(
       input.provider.instanceId,
-      input.provider.values
+      providerValues
     );
     const payload: Record<string, unknown> = {
       paperlessUrl: input.paperless.baseUrl.replace(/\/+$/, ''),
@@ -44,7 +58,8 @@ export async function POST(request: Request) {
       activateTitle: true,
       activateCustomFields: false,
       activateOwnerAssignment: true,
-      disableAutomaticProcessing: false,
+      disableAutomaticProcessing: true,
+      write_mode: 'review',
       aiReasoningEffort: 'auto'
     };
     const backend = process.env.TAGVICO_BACKEND_URL || 'http://127.0.0.1:3001';

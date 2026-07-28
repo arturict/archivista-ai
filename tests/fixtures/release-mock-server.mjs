@@ -1,6 +1,8 @@
 import http from 'node:http';
 
 const port = Number(process.env.PORT || 4010);
+const releaseDocumentId = Number(process.env.RELEASE_DOCUMENT_ID || 42);
+const releaseActionDocumentId = Number(process.env.RELEASE_ACTION_DOCUMENT_ID || 43);
 const documents = new Map([
   [42, {
     id: 42,
@@ -64,7 +66,7 @@ const server = http.createServer(async (request, response) => {
     const hasToolResult = Array.isArray(body.messages) && body.messages.some((message) => message.role === 'tool');
     if (body.stream && requestsProposal && !hasToolResult) {
       const argumentsJson = JSON.stringify({
-        paperlessDocumentId: 43,
+        paperlessDocumentId: releaseActionDocumentId,
         title: 'Review synthetic renewal terms',
         summary: 'Prepared by the synthetic v3 release fixture.',
         priority: 'high',
@@ -79,7 +81,7 @@ const server = http.createServer(async (request, response) => {
     }
     if (body.stream && requestsDocumentRead && !hasToolResult) {
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-      response.write(`data: ${JSON.stringify({ id: 'chatcmpl-release-read', object: 'chat.completion.chunk', created: 0, model: body.model || 'release-mock', choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, id: 'call_release_document', type: 'function', function: { name: 'get_document', arguments: JSON.stringify({ documentId: 42 }) } }] }, finish_reason: null }] })}\n\n`);
+      response.write(`data: ${JSON.stringify({ id: 'chatcmpl-release-read', object: 'chat.completion.chunk', created: 0, model: body.model || 'release-mock', choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, id: 'call_release_document', type: 'function', function: { name: 'get_document', arguments: JSON.stringify({ documentId: releaseDocumentId }) } }] }, finish_reason: null }] })}\n\n`);
       response.write(`data: ${JSON.stringify({ id: 'chatcmpl-release-read', object: 'chat.completion.chunk', created: 0, model: body.model || 'release-mock', choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`);
       response.end('data: [DONE]\n\n');
       return;
@@ -87,7 +89,7 @@ const server = http.createServer(async (request, response) => {
     const content = requestsProposal
       ? 'The requested synthetic proposal is ready for approval.'
       : requestsDocumentRead
-        ? 'The synthetic insurance renewal is due on 15 August 2026 [doc:42].'
+        ? `The verified synthetic source is available in Paperless [doc:${releaseDocumentId}].`
         : 'Synthetic release response.';
     if (body.stream) {
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });

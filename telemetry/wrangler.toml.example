@@ -2,6 +2,9 @@ name = "tagvico-telemetry"
 main = "worker.js"
 compatibility_date = "2026-07-01"
 
+[vars]
+PUBLIC_ORIGIN = "https://tagvico.arturf.ch"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "tagvico-telemetry"

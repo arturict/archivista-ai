@@ -32,6 +32,32 @@ const setupPayload = {
   }
 };
 
+const paperlessProbe = await responseJson(await request('/api/paperless/probe', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    url: setupPayload.paperless.baseUrl,
+    token: setupPayload.paperless.token
+  })
+}));
+assert.equal(paperlessProbe.response.status, 200, JSON.stringify(paperlessProbe.body));
+assert.equal(paperlessProbe.body.success, true);
+assert.equal(paperlessProbe.body.instance?.authenticated, true);
+assert.equal(paperlessProbe.body.instance?.error, null);
+
+const providerProbe = await responseJson(await request('/api/setup/v3/provider-probe', {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    instanceId: setupPayload.provider.instanceId,
+    values: setupPayload.provider.values
+  })
+}));
+assert.equal(providerProbe.response.status, 200, JSON.stringify(providerProbe.body));
+assert.equal(providerProbe.body.ok, true);
+assert.ok(providerProbe.body.models.some((model) => model.id === setupPayload.provider.modelId));
+assert.equal(JSON.stringify(providerProbe.body).includes(setupPayload.provider.values.apiKey), false);
+
 const setup = await responseJson(await request('/api/setup/v3', { method: 'POST', headers, body: JSON.stringify(setupPayload) }));
 assert.equal(setup.response.status, 200, JSON.stringify(setup.body));
 assert.equal(setup.body.success, true);
@@ -47,6 +73,13 @@ assert.equal(login.response.status, 200, JSON.stringify(login.body));
 const cookie = login.response.headers.get('set-cookie')?.split(';')[0];
 assert.ok(cookie?.startsWith('jwt='));
 const authenticatedHeaders = { ...headers, cookie };
+
+const settings = await responseJson(await request('/api/settings/v3', { headers: { cookie } }));
+assert.equal(settings.response.status, 200, JSON.stringify(settings.body));
+assert.equal(settings.body.automation.writeMode, 'review');
+assert.equal(settings.body.automation.automaticProcessing, false);
+assert.equal(JSON.stringify(settings.body).includes(setupPayload.paperless.token), false);
+assert.equal(JSON.stringify(settings.body).includes(setupPayload.provider.values.apiKey), false);
 
 const action = await responseJson(await request('/api/actions', {
   method: 'POST', headers: authenticatedHeaders, body: JSON.stringify({ paperlessDocumentId: 42, title: 'Compare renewal offer', summary: 'Synthetic release acceptance case', dueAt: '2026-08-15', priority: 'high' })
@@ -148,7 +181,7 @@ for (const page of ['/actions', `/actions/${actionId}`, '/companion', '/settings
   assert.equal(new URL(response.url).pathname, page, `${page} redirected to ${response.url}`);
   assert.match(response.headers.get('content-type') || '', /text\/html/);
   const html = await response.text();
-  assert.match(html, page === '/companion' ? /Ask Tagvico/i : page === '/settings' ? /Settings \| Tagvico AI/i : /Action center|Compare renewal offer/i);
+  assert.match(html, page === '/companion' ? /Ask Tagvico/i : page === '/settings' ? /Settings \| Tagvico/i : /Action center|Compare renewal offer/i);
 }
 
-process.stdout.write(JSON.stringify({ ok: true, actionId, ownerMemberId, memberId, checks: 46 }, null, 2) + '\n');
+process.stdout.write(JSON.stringify({ ok: true, actionId, ownerMemberId, memberId, checks: 60 }, null, 2) + '\n');

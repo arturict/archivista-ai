@@ -49,13 +49,20 @@ function secret(key: string, label: string, environmentKey: string, required = f
   };
 }
 
-function url(key: string, label: string, environmentKey: string, required = true): ProviderDefinition['fields'][number] {
+function url(
+  key: string,
+  label: string,
+  environmentKey: string,
+  required = true,
+  defaultValue?: string
+): ProviderDefinition['fields'][number] {
   return {
     key,
     label,
     environmentKey,
     type: 'url',
     required,
+    ...(defaultValue ? { defaultValue } : {}),
     secret: false
   };
 }
@@ -81,7 +88,10 @@ const definitions = [
     }).strict(),
     fields: [
       secret('apiKey', 'API key', 'OPENROUTER_API_KEY', true),
-      { ...url('baseUrl', 'Base URL', 'OPENROUTER_BASE_URL'), placeholder: 'https://openrouter.ai/api/v1' }
+      {
+        ...url('baseUrl', 'Base URL', 'OPENROUTER_BASE_URL', true, 'https://openrouter.ai/api/v1'),
+        placeholder: 'https://openrouter.ai/api/v1'
+      }
     ],
     suggestedModels: [
       { id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 Mini', description: 'Curated balanced suggestion; availability is verified against your live catalog.' },
@@ -107,7 +117,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Ollama URL', 'OLLAMA_API_URL'), placeholder: 'http://localhost:11434' },
+      {
+        ...url('baseUrl', 'Ollama URL', 'OLLAMA_API_URL', true, 'http://localhost:11434'),
+        placeholder: 'http://localhost:11434'
+      },
       secret('apiKey', 'API key (optional)', 'OLLAMA_API_KEY')
     ],
     suggestedModels: [],
@@ -131,7 +144,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Cloud URL', 'OLLAMA_CLOUD_API_URL'), placeholder: 'https://ollama.com' },
+      {
+        ...url('baseUrl', 'Cloud URL', 'OLLAMA_CLOUD_API_URL', true, 'https://ollama.com'),
+        placeholder: 'https://ollama.com'
+      },
       secret('apiKey', 'API key', 'OLLAMA_CLOUD_API_KEY', true)
     ],
     suggestedModels: [],
@@ -155,7 +171,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Base URL', 'OPENCODE_BASE_URL'), placeholder: 'https://opencode.ai/zen/go/v1' },
+      {
+        ...url('baseUrl', 'Base URL', 'OPENCODE_BASE_URL', true, 'https://opencode.ai/zen/go/v1'),
+        placeholder: 'https://opencode.ai/zen/go/v1'
+      },
       secret('apiKey', 'API key', 'OPENCODE_API_KEY', true)
     ],
     suggestedModels: [],
