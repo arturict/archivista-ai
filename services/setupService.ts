@@ -218,15 +218,34 @@ class SetupService {
 
   async validateOllamaConfig(url: string, model?: string, apiKey = '') {
     try {
-      const response = await axios.post(`${url}/api/generate`, {
+      const response = await axios.post(`${url.replace(/\/$/, '')}/api/chat`, {
         model: model || 'llama3.2',
-        prompt: 'Test',
-        stream: false
+        messages: [{
+          role: 'user',
+          content: `Call ${SETUP_TOOL_NAME} with supported set to true.`
+        }],
+        tools: [{
+          type: 'function',
+          function: {
+            name: SETUP_TOOL_NAME,
+            description: 'Confirms that the selected model can call tools required by Tagvico.',
+            parameters: {
+              type: 'object',
+              properties: { supported: { type: 'boolean' } },
+              required: ['supported']
+            }
+          }
+        }],
+        stream: false,
+        options: { num_predict: 32 }
       }, {
         timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined
       });
-      return response.data && response.data.response;
+      return Boolean(response.data?.message?.tool_calls?.some(
+        (tool: { function?: { name?: string } }) =>
+          tool.function?.name === SETUP_TOOL_NAME
+      ));
     } catch (error) {
       console.error('Ollama validation error:', errorMessage(error));
       return false;

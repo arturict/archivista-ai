@@ -18,5 +18,13 @@ namespace_id = "1001"
   limit = 60
   period = 60
 
+[[ratelimits]]
+name = "HEARTBEAT_RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
+
 [triggers]
 crons = ["17 3 * * *"]

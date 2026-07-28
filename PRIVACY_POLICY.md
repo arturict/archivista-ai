@@ -84,11 +84,12 @@ addresses or user-agent headers. Infrastructure request logging must be
 disabled or minimized before this endpoint is enabled.
 
 The landing page may show two deliberately separate statistics: page views
-over the previous 30 days, and opted-in active installations for the current
-month. Installation totals below five are not published exactly. GitHub
-independently processes repository visits, stars, clones, issues, and release
-access under GitHub's own terms. Those GitHub statistics are not treated as
-Tagvico installations or users.
+over the previous 30 days, and unauthenticated reports from opted-in active
+installations for the current month. Both public write paths fail closed
+without their shared-key rate limiter, and installation totals below five are
+not published exactly. GitHub independently processes repository visits,
+stars, clones, issues, and release access under GitHub's own terms. Those
+GitHub statistics are not treated as Tagvico installations or users.
 
 The in-app update check and star count request public release and repository
 data directly from GitHub; Tagvico does not receive those requests. See the

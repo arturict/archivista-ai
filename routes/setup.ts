@@ -78,6 +78,7 @@ const totpService = require('../services/totpService');
 const pendingMfaSecrets = new Map();
 
 type UnknownRecord = Record<string, unknown>;
+type SetupProviderStatus = { ok: boolean; models: string[]; error?: string };
 interface NamedItem { id: number; name: string; model?: string; size?: number; modified_at?: string }
 interface DocumentData { id: number; title: string; created?: string; owner?: number; tags?: number[]; correspondent?: number; document_type?: number; custom_fields?: UnknownRecord[]; language?: string }
 interface AnalysisData {
@@ -3928,6 +3929,7 @@ router.get('/api/health', async (req: Req, res: Res) => {
  *                   example: "Failed to save configuration: Database error"
  */
 let setupRequestQueue: Promise<void> = Promise.resolve();
+const SETUP_PROVIDER_TIMEOUT_MS = 15_000;
 
 async function acquireSetupRequestLock(): Promise<() => void> {
   const previous = setupRequestQueue;
@@ -3937,6 +3939,21 @@ async function acquireSetupRequestLock(): Promise<() => void> {
   });
   await previous;
   return release;
+}
+
+async function withSetupProviderTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error('Provider validation timed out. Retry the connection check.')),
+      SETUP_PROVIDER_TIMEOUT_MS
+    );
+  });
+  try {
+    return await Promise.race([operation, deadline]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 router.post('/setup', express.json(), async (req: Req, res: Res) => {
@@ -4121,7 +4138,13 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
         });
       }
     } else if (providerConfig.provider === 'copilot') {
-      const status = await copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken });
+      const status = await withSetupProviderTimeout<SetupProviderStatus>(
+        copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken })
+      ).catch((error): SetupProviderStatus => ({
+        ok: false,
+        models: [],
+        error: errorMessage(error)
+      }));
       if (!status.ok || !status.models.includes(providerConfig.selectedModel)) {
         return res.status(400).json({
           error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`

@@ -91,7 +91,7 @@ export default {
         opted_in_active_installations: {
           ...publicCount(activeInstallations.results[0]?.value),
           period: 'current_month',
-          note: 'Only installations with anonymous analytics enabled are counted.'
+          note: 'Unauthenticated reports from installations with anonymous analytics enabled.'
         },
         generated_at: new Date().toISOString()
       }, 200, {
@@ -101,6 +101,13 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/heartbeat') {
+      if (!env.HEARTBEAT_RATE_LIMITER?.limit) {
+        return json({ error: 'rate_limit_unavailable' }, 503);
+      }
+      const rateLimit = await env.HEARTBEAT_RATE_LIMITER.limit({ key: 'installation-heartbeat' });
+      if (!rateLimit.success) {
+        return json({ error: 'rate_limited' }, 429, { 'retry-after': '60' });
+      }
       let payload;
       try { payload = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
       if (!validate(payload)) return json({ error: 'invalid_payload' }, 400);

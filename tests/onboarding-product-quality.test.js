@@ -56,9 +56,12 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /confirm_tagvico_tool_support/);
   assert.match(setupService, /tool_choice/);
   assert.match(setupService, /hasSetupToolCall/);
+  assert.match(setupService, /\/api\/chat/);
+  assert.match(setupService, /message\?\.tool_calls/);
   assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
   assert.match(setupService, /selectedModel \|\| process\.env\.OPENAI_MODEL/);
   assert.match(setupRoutes, /validateOpenAIConfig\(\s*providerConfig\.openaiApiKey,\s*providerConfig\.selectedModel/);
+  assert.match(setupRoutes, /withSetupProviderTimeout(?:<SetupProviderStatus>)?\(\s*copilotService\.healthcheck/);
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
   assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
   assert.match(fixture, /\/catalogless\/chat\/completions/);
@@ -217,6 +220,7 @@ test('public metrics receiver rejects foreign origins, bounds writes and suppres
     }
   };
   let pageviewAllowed = true;
+  let heartbeatAllowed = true;
   const env = {
     DB: db,
     PUBLIC_ORIGIN: 'https://tagvico.example',
@@ -224,6 +228,12 @@ test('public metrics receiver rejects foreign origins, bounds writes and suppres
       async limit({ key }) {
         assert.equal(key, 'landing-pageview');
         return { success: pageviewAllowed };
+      }
+    },
+    HEARTBEAT_RATE_LIMITER: {
+      async limit({ key }) {
+        assert.equal(key, 'installation-heartbeat');
+        return { success: heartbeatAllowed };
       }
     }
   };
@@ -256,6 +266,40 @@ test('public metrics receiver rejects foreign origins, bounds writes and suppres
     headers: { origin: env.PUBLIC_ORIGIN }
   }), { DB: db, PUBLIC_ORIGIN: env.PUBLIC_ORIGIN });
   assert.equal(unavailable.status, 503);
+
+  const heartbeatPayload = {
+    schema: 1,
+    daily_id: 'a'.repeat(64),
+    monthly_id: 'b'.repeat(64),
+    period: { day: '2026-07-28', month: '2026-07' },
+    version: '3.2.0',
+    documents_processed: '11-100',
+    write_mode: 'review',
+    provider_category: 'local',
+    features: { ocr_rescue: false, custom_fields: true, controlled_tags: true }
+  };
+  const heartbeat = () => new Request('https://metrics.example/v1/heartbeat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(heartbeatPayload)
+  });
+  const acceptedHeartbeat = await worker.fetch(heartbeat(), env);
+  assert.equal(acceptedHeartbeat.status, 202);
+  assert.ok(statements.some((sql) => sql.includes('INSERT INTO heartbeats')));
+
+  const writesBeforeHeartbeatLimit = statements.length;
+  heartbeatAllowed = false;
+  const limitedHeartbeat = await worker.fetch(heartbeat(), env);
+  assert.equal(limitedHeartbeat.status, 429);
+  assert.equal(limitedHeartbeat.headers.get('retry-after'), '60');
+  assert.equal(statements.length, writesBeforeHeartbeatLimit);
+
+  const heartbeatLimitUnavailable = await worker.fetch(heartbeat(), {
+    DB: db,
+    PAGEVIEW_RATE_LIMITER: env.PAGEVIEW_RATE_LIMITER
+  });
+  assert.equal(heartbeatLimitUnavailable.status, 503);
+  assert.equal(statements.length, writesBeforeHeartbeatLimit);
 
   const summary = await worker.fetch(new Request('https://metrics.example/v1/public-summary', {
     headers: { origin: env.PUBLIC_ORIGIN }

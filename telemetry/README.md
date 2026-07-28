@@ -12,11 +12,14 @@ Public installation totals below five are suppressed instead of exposing an
 exact small count. Marketing page views and opted-in active installations must
 always be labelled separately.
 
-The pageview write path fails closed unless the Cloudflare Workers Rate
-Limiting binding is present. It permits at most 60 accepted pageview writes per
-minute in each Cloudflare location using one shared route key. This bounds
-forged-origin inflation and database-write cost without adding an IP address,
-cookie, visitor identifier, or fingerprint to Tagvico's data.
+Both public write paths fail closed unless their Cloudflare Workers Rate
+Limiting bindings are present. One shared route key permits at most 60 accepted
+pageview writes per minute in each Cloudflare location. A separate shared route
+key permits at most 30 heartbeat writes per minute. These bounds limit forged
+metric inflation and database-write cost without adding an IP address, cookie,
+visitor identifier, or fingerprint to Tagvico's data. Installation reports
+remain unauthenticated, so the public total is a bounded, opted-in signal rather
+than a verified user count.
 
 Network infrastructure still processes an IP address while delivering a
 request. Review the hosting provider's own request-log, data-processing,
@@ -24,7 +27,7 @@ retention, and regional settings before deploying.
 
 1. Create a D1 database and apply `schema.sql`.
 2. Copy `wrangler.toml.example` to `wrangler.toml`, set the database ID, and
-   keep the `PAGEVIEW_RATE_LIMITER` binding enabled.
+   keep both rate-limiter bindings enabled.
 3. Store a long random `ADMIN_TOKEN` with `wrangler secret put ADMIN_TOKEN`.
 4. Set `PUBLIC_ORIGIN` to the exact landing-page origin.
 5. Deploy, attach `telemetry.tagvico.arturf.ch`, and disable request-log storage
