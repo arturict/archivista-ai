@@ -91,6 +91,7 @@ test('new setup starts in review mode with scheduled scans paused', () => {
 
 test('setup is serialized and remains retryable until the owner exists', () => {
   const setupRoutes = read('routes/setup.ts');
+  const documentModel = read('models/document.ts');
   const handler = setupRoutes.slice(
     setupRoutes.indexOf('let setupRequestQueue'),
     setupRoutes.indexOf("router.post('/settings'")
@@ -102,10 +103,30 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(handler, /setupPendingRequests -= 1/);
   assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
   assert.ok(
-    handler.indexOf('documentModel.addUser') < handler.indexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
+    handler.indexOf('documentModel.getUsers') < handler.indexOf('buildConfigForSave')
+  );
+  assert.match(handler, /existingOwners\.length > 0/);
+  assert.match(handler, /An owner account already exists/);
+  assert.doesNotMatch(documentModel, /DELETE FROM users/);
+  assert.match(documentModel, /db\.transaction/);
+  assert.match(documentModel, /SELECT COUNT\(\*\) AS count FROM users/);
+  assert.match(documentModel, /Refusing to replace an existing owner account/);
+  assert.ok(
+    handler.indexOf('documentModel.addUser') < handler.lastIndexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
   );
   assert.match(handler, /Initial setup remains open for retry/);
   assert.match(read('services/paperlessService.ts'), /timeout: PAPERLESS_REQUEST_TIMEOUT_MS/);
+});
+
+test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {
+  const copilot = read('services/copilotService.ts');
+  assert.match(copilot, /COPILOT_OPERATION_TIMEOUT_MS = 10_000/);
+  assert.match(copilot, /COPILOT_SHUTDOWN_TIMEOUT_MS = 2_000/);
+  assert.match(copilot, /withCopilotTimeout\(client\.start\(\), 'startup'\)/);
+  assert.match(copilot, /withCopilotTimeout\(client\.getAuthStatus\(\), 'authentication check'\)/);
+  assert.match(copilot, /withCopilotTimeout\(client\.listModels\(\), 'model discovery'\)/);
+  assert.match(copilot, /await stopClient\(client\)/);
+  assert.match(copilot, /fs\.rm\(workingDirectory, \{ recursive: true, force: true \}\)/);
 });
 
 test('account providers are selected atomically with a live model', () => {

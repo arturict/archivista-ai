@@ -3978,6 +3978,15 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
         error: 'Setup has already been completed. Sign in to change settings.'
       });
     }
+    const existingOwners = await documentModel.getUsers();
+    if (existingOwners.length > 0) {
+      // Recover the only crash window between owner creation and the final
+      // setup marker. Never accept another public setup payload in this state.
+      await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
+      return res.status(409).json({
+        error: 'An owner account already exists. Setup has been closed; sign in to continue.'
+      });
+    }
 
     const { 
       paperlessUrl, 

@@ -17,6 +17,8 @@ const path = require('path');
 type CopilotOverrides = { home?: string; gitHubToken?: string };
 type CopilotRuntime = { client: CopilotClient; workingDirectory: string };
 type CopilotReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
+const COPILOT_OPERATION_TIMEOUT_MS = 10_000;
+const COPILOT_SHUTDOWN_TIMEOUT_MS = 2_000;
 
 function presentModels(models: ModelInfo[]) {
   return models
@@ -39,6 +41,34 @@ const nativeImport = new Function('specifier', 'return import(specifier)') as (
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function withCopilotTimeout<T>(
+  operation: Promise<T>,
+  label: string,
+  timeoutMs = COPILOT_OPERATION_TIMEOUT_MS
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error(`GitHub Copilot ${label} timed out`)),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([operation, deadline]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function stopClient(client: CopilotClient | undefined) {
+  if (!client) return;
+  await withCopilotTimeout(
+    client.stop(),
+    'shutdown',
+    COPILOT_SHUTDOWN_TIMEOUT_MS
+  ).catch(() => {});
 }
 
 function parseStructuredResponse(content: unknown): Record<string, unknown> {
@@ -86,8 +116,14 @@ class CopilotService {
       useLoggedInUser: !gitHubToken,
       logLevel: 'error'
     });
-    await client.start();
-    return { client, workingDirectory };
+    try {
+      await withCopilotTimeout(client.start(), 'startup');
+      return { client, workingDirectory };
+    } catch (error) {
+      await stopClient(client);
+      await fs.rm(workingDirectory, { recursive: true, force: true }).catch(() => {});
+      throw error;
+    }
   }
 
   async healthcheck(overrides: CopilotOverrides = {}) {
@@ -106,7 +142,7 @@ class CopilotService {
     const started = Date.now();
     try {
       ({ client, workingDirectory } = await this.createClient(overrides));
-      const auth = await client.getAuthStatus();
+      const auth = await withCopilotTimeout(client.getAuthStatus(), 'authentication check');
       if (!auth.isAuthenticated) {
         return {
           ok: false,
@@ -117,7 +153,7 @@ class CopilotService {
           error: auth.statusMessage || 'GitHub Copilot is not signed in'
         };
       }
-      const models = presentModels(await client.listModels());
+      const models = presentModels(await withCopilotTimeout(client.listModels(), 'model discovery'));
       return {
         ok: true,
         authenticated: true,
@@ -135,7 +171,7 @@ class CopilotService {
         error: errorMessage(error)
       };
     } finally {
-      await client?.stop().catch(() => {});
+      await stopClient(client);
       if (workingDirectory) await fs.rm(workingDirectory, { recursive: true, force: true }).catch(() => {});
     }
   }
