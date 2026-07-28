@@ -36,6 +36,7 @@ fs.writeFileSync(path.join(dataDir, '.env'), [
 const service = require('../dist/services/settingsV3Service');
 const setupService = require('../dist/services/setupService');
 const runtimeEnvironment = require('../dist/services/runtimeEnvironment');
+const providerDiscoveryService = require('../dist/services/providerDiscoveryService');
 
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
@@ -164,4 +165,30 @@ test('PATCH rejects unsupported enrichment methods, unsafe URLs and malformed JS
     revision: current.revision,
     patch: { security: { externalApiHeaders: 'not-json' } }
   }), /valid JSON object/);
+});
+
+test('PATCH validates subscription models before persisting v3 settings', async () => {
+  const discoverProviderModels = providerDiscoveryService.discoverProviderModels;
+  providerDiscoveryService.discoverProviderModels = async (providerId) => {
+    assert.equal(providerId, 'codex');
+    return [{ id: 'available-account-model', name: 'Available account model' }];
+  };
+  try {
+    const current = await service.getSettings();
+    const before = await setupService.loadConfig();
+    await assert.rejects(service.patchSettings({
+      revision: current.revision,
+      patch: {
+        ai: {
+          activeProviderInstanceId: 'codex',
+          activeModelId: 'stale-account-model'
+        }
+      }
+    }), /not available to this runtime account/);
+    const after = await setupService.loadConfig();
+    assert.equal(after.AI_PROVIDER, before.AI_PROVIDER);
+    assert.equal(after.CODEX_MODEL, before.CODEX_MODEL);
+  } finally {
+    providerDiscoveryService.discoverProviderModels = discoverProviderModels;
+  }
 });

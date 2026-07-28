@@ -7,6 +7,7 @@ import {
   applyPersistedAiSelection,
   UI_MANAGED_AI_SELECTION_KEY
 } from './managedAiSelection';
+import providerDiscoveryService from './providerDiscoveryService';
 import setupService from './setupService';
 
 const providerRegistryModule = require('./providerRegistry');
@@ -444,6 +445,23 @@ async function patchSettings(input: unknown) {
     throw new RevisionConflictError('Settings changed in another session. Reload before saving again.');
   }
   const patch = applySectionPatch(parsed, effective);
+  const selectionChanged = parsed.patch.ai?.activeProviderInstanceId !== undefined
+    || parsed.patch.ai?.activeModelId !== undefined;
+  const activeProviderId = String(patch.AI_PROVIDER || effective.AI_PROVIDER || 'openrouter').trim();
+  if (selectionChanged && ['codex', 'copilot'].includes(activeProviderId)) {
+    const definition = providerRegistry.getProviderDefinition(activeProviderId);
+    const candidateEnvironment = { ...effective, ...patch };
+    const selectedModelId = definition
+      ? providerRegistry.getConfiguredModel(definition, candidateEnvironment)
+      : '';
+    const availableModels = await providerDiscoveryService.discoverProviderModels(
+      activeProviderId,
+      candidateEnvironment
+    );
+    if (!selectedModelId || !availableModels.some((model: { id: string }) => model.id === selectedModelId)) {
+      throw new Error('The selected model is not available to this runtime account.');
+    }
+  }
   if (Object.keys(patch).length) await setupService.savePartialConfig(patch);
   return getSettings();
 }
