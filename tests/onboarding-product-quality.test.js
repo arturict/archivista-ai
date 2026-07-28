@@ -11,6 +11,14 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   assert.match(wizard, /fetch\('\/api\/setup\/v3\/provider-probe'/);
   assert.match(wizard, /fetch\('\/api\/setup\/v3\/codex\/login'/);
   assert.match(wizard, /ChatGPT account/);
+  assert.match(wizard, /const updateProviderValue/);
+  assert.match(wizard, /Connection details changed\. Check the runtime again/);
+  const providerInvalidation = wizard.slice(
+    wizard.indexOf('const updateProviderValue'),
+    wizard.indexOf('const checkPaperless')
+  );
+  assert.match(providerInvalidation, /setModels\(\[\]\)/);
+  assert.match(providerInvalidation, /modelId: ''/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
@@ -85,6 +93,18 @@ test('Docker release fixture keeps the mock document IDs used by acceptance', ()
   assert.match(fixture, /RELEASE_ACTION_DOCUMENT_ID \|\| 43/);
   assert.match(acceptance, /doc:42/);
   assert.match(acceptance, /for \(const documentId of \[42, 43\]\)/);
+});
+
+test('manual Paperless option failures return a retryable response instead of rejecting the route', () => {
+  const routes = read('routes/setup.ts');
+  const handler = routes.slice(
+    routes.indexOf("router.get('/manual/options'"),
+    routes.indexOf('/manual/tags:')
+  );
+  assert.match(handler, /try\s*\{/);
+  assert.match(handler, /catch \(error\)/);
+  assert.match(handler, /res\.status\(502\)\.json/);
+  assert.match(handler, /Check the connection and retry/);
 });
 
 test('landing metrics stay separate, anonymous and privacy-signal aware', () => {

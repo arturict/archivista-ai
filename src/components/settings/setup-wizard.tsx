@@ -130,6 +130,23 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
     setState((current) => ({ ...current, [key]: value }));
   };
 
+  const updateProviderValue = (key: string, value: string) => {
+    if (state.providerValues[key] === value) return;
+    setModels([]);
+    setState((current) => ({
+      ...current,
+      modelId: '',
+      providerValues: {
+        ...current.providerValues,
+        [key]: value
+      }
+    }));
+    setStatus({
+      kind: 'neutral',
+      message: 'Connection details changed. Check the runtime again before continuing.'
+    });
+  };
+
   const checkPaperless = async () => {
     if (!state.paperlessUrl.trim() || !state.paperlessToken.trim()) {
       setStatus({ kind: 'error', message: 'Enter the Paperless base URL and an API token first.' });
@@ -414,10 +431,7 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
               autoComplete={field.secret ? 'new-password' : 'off'}
               placeholder={field.placeholder}
               value={state.providerValues[field.key] || ''}
-              onChange={(event) => update('providerValues', {
-                ...state.providerValues,
-                [field.key]: event.target.value
-              })}
+              onChange={(event) => updateProviderValue(field.key, event.target.value)}
             />
             {field.description ? <span className="settings-field-help">{field.description}</span> : null}
           </label>)}

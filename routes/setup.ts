@@ -2324,17 +2324,24 @@ router.get('/manual', (_req: Req, res: Res) => {
 });
 
 router.get('/manual/options', async (_req: Req, res: Res) => {
-  const [correspondents, documentTypes, users] = await Promise.all([
-    paperlessService.listCorrespondentsNames(),
-    paperlessService.listDocumentTypesNames(),
-    paperlessService.getUsers()
-  ]);
+  try {
+    const [correspondents, documentTypes, users] = await Promise.all([
+      paperlessService.listCorrespondentsNames(),
+      paperlessService.listDocumentTypesNames(),
+      paperlessService.getUsers()
+    ]);
 
-  res.json({
-    correspondents: correspondents.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
-    documentTypes: documentTypes.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
-    users: users.map(({ id, username }: { id?: number; username?: string }) => ({ id, username }))
-  });
+    res.json({
+      correspondents: correspondents.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+      documentTypes: documentTypes.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+      users: users.map(({ id, username }: { id?: number; username?: string }) => ({ id, username }))
+    });
+  } catch (error) {
+    console.error('[ERROR] Could not load manual Paperless options:', errorMessage(error));
+    res.status(502).json({
+      error: 'Paperless metadata options could not be loaded. Check the connection and retry.'
+    });
+  }
 });
 
 /**
