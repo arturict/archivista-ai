@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs';
+import { promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
 import axios from 'axios';
 import { AzureOpenAI, OpenAI } from 'openai';
@@ -104,6 +104,7 @@ function hasSupportedSetupArguments(value: unknown): boolean {
 class SetupService {
   private readonly envPath: string;
   private readonly injectedEnvironmentKeys: Set<string>;
+  private persistedEnvironmentKeys: Set<string>;
   private configured: boolean | null;
   private writeQueue: Promise<void> = Promise.resolve();
 
@@ -114,7 +115,16 @@ class SetupService {
         ? [...runtimeConfig.injectedEnvironment]
         : []
     );
+    this.persistedEnvironmentKeys = new Set(Object.keys(this.readPersistedEnvironment() || {}));
     this.configured = null; // Variable to store the configuration status
+  }
+
+  private readPersistedEnvironment(): SetupConfig | null {
+    try {
+      return dotenv.parse(readFileSync(this.envPath, 'utf8'));
+    } catch {
+      return null;
+    }
   }
 
   async loadConfig(): Promise<SetupConfig | null> {
@@ -146,27 +156,37 @@ class SetupService {
 
   async validateApiPermissions(url: string, token: string) {
     const baseUrl = String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
-    for (const endpoint of ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users']) {
-      try {
-        console.log(`Validating API permissions for ${baseUrl}/api/${endpoint}/`);
-        const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
-          timeout: SETUP_VALIDATION_TIMEOUT_MS,
-          headers: {
-            'Authorization': `Token ${token}`
+    const checks = await Promise.all(
+      ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users'].map(async (endpoint) => {
+        try {
+          console.log(`Validating API permissions for ${baseUrl}/api/${endpoint}/`);
+          const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
+            timeout: SETUP_VALIDATION_TIMEOUT_MS,
+            headers: {
+              'Authorization': `Token ${token}`
+            }
+          });
+          console.log(`API permissions validated for ${endpoint}, ${response.status}`);
+          if (response.status !== 200) {
+            console.error(`API permissions validation failed for ${endpoint}`);
+            return endpoint;
           }
-        });
-        console.log(`API permissions validated for ${endpoint}, ${response.status}`);
-        if (response.status !== 200) {
-          console.error(`API permissions validation failed for ${endpoint}`);
-          return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+        } catch (error) {
+          console.error(`API permissions validation failed for ${endpoint}:`, errorMessage(error));
+          return endpoint;
         }
-      } catch (error) {
-        console.error(`API permissions validation failed for ${endpoint}:`, errorMessage(error));
-        return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
-      }
+        return null;
+      })
+    );
+    const failedEndpoint = checks.find(Boolean);
+    if (failedEndpoint) {
+      return {
+        success: false,
+        message: `API permissions validation failed for endpoint '/api/${failedEndpoint}/'`
+      };
     }
     return { success: true, message: 'API permissions validated successfully' };
-}
+  }
 
 
   async validateOpenAIConfig(apiKey?: string, selectedModel?: string): Promise<boolean> {
@@ -427,23 +447,15 @@ class SetupService {
     try {
       // Validate the new configuration before saving
       await this.validateConfig(config);
-
-      const JSON_STANDARD_PROMPT = `
-        Return the result EXCLUSIVELY as a JSON object. The Tags and Title MUST be in the language that is used in the document.:
-        
-        {
-          "title": "xxxxx",
-          "correspondent": "xxxxxxxx",
-          "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
-          "document_date": "YYYY-MM-DD",
-          "language": "en/de/es/..."
-        }`;
-
       await this.persistConfig(config);
     } catch (error) {
       console.error('Error saving config:', errorMessage(error));
       throw error;
     }
+  }
+
+  async saveValidatedConfig(config: SetupConfig): Promise<void> {
+    await this.persistConfig(config);
   }
 
   async saveTagPolicy(policy: SetupConfig) {
@@ -500,15 +512,22 @@ class SetupService {
     } finally {
       await fs.rm(temporaryPath, { force: true }).catch(() => {});
     }
-    Object.entries(config).forEach(([key, value]) => {
-      if (!this.injectedEnvironmentKeys.has(key)) process.env[key] = String(value);
-    });
     this.reloadRuntimeConfig();
     const setupMarker = config?.TAGVICO_AI_INITIAL_SETUP || config?.ARCHIVISTA_AI_INITIAL_SETUP;
     this.configured = Boolean(config.PAPERLESS_API_URL && setupMarker === 'yes');
   }
 
   reloadRuntimeConfig() {
+    const persistedEnvironment = this.readPersistedEnvironment();
+    if (persistedEnvironment) {
+      for (const key of this.persistedEnvironmentKeys) {
+        if (!this.injectedEnvironmentKeys.has(key)) delete process.env[key];
+      }
+      for (const [key, value] of Object.entries(persistedEnvironment)) {
+        if (!this.injectedEnvironmentKeys.has(key)) process.env[key] = value;
+      }
+      this.persistedEnvironmentKeys = new Set(Object.keys(persistedEnvironment));
+    }
     const injectedEnvironment = runtimeConfig.injectedEnvironment;
     const configPath = require.resolve('../config/config');
     delete require.cache[configPath];

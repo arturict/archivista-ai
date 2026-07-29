@@ -24,7 +24,8 @@ export const changelogEntries: ChangelogEntry[] = [
           'Non-secret progress can resume in the same tab without storing Paperless tokens, passwords, provider keys or account credentials in the browser draft.',
           'New installations start in Review first mode with scheduled scans paused and continue directly to Ask Tagvico after setup.',
           'Scheduled scans can be enabled later in Settings without restarting the container.',
-          'Abandoned ChatGPT device sign-ins expire server-side and release their Codex process before the next attempt.'
+          'Abandoned ChatGPT device sign-ins expire server-side, release their Codex process before the next attempt and rate-limit new login processes.',
+          'Paperless permission checks run concurrently and verified setup is persisted once so slow connections stay within one completion deadline.'
         ]
       },
       {

@@ -75,6 +75,7 @@ const controlledTaggingService = require('../services/controlledTaggingService')
 const { createRateLimiter } = require('../services/rateLimiter');
 const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'login' });
 const setupLimiter = createRateLimiter({ windowMs: 60_000, max: 10, keyPrefix: 'setup' });
+const codexLoginLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, keyPrefix: 'codex-login' });
 const totpService = require('../services/totpService');
 const pendingMfaSecrets = new Map();
 
@@ -4266,7 +4267,7 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
     // complete until an owner account exists. A crash anywhere before the
     // final marker remains safely retryable through the serialized setup path.
     config.TAGVICO_AI_INITIAL_SETUP = 'no';
-    await setupService.saveConfig(config);
+    await setupService.saveValidatedConfig(config);
     resetRuntimeServices();
     const tagProvisioning = await provisionControlledTags();
     onboardingService.writeOnboardingSnapshot(config);
@@ -5024,7 +5025,7 @@ router.get('/api/codex/models', allowDuringSetup, async (req: Req, res: Res) => 
   }
 });
 
-router.post('/api/codex/login', allowDuringSetup, express.json(), async (req: Req, res: Res) => {
+router.post('/api/codex/login', allowDuringSetup, codexLoginLimiter, express.json(), async (req: Req, res: Res) => {
   try { res.json(await codexAuthService.login(req.body?.type === 'chatgpt' ? 'chatgpt' : 'chatgptDeviceCode')); }
   catch (error) { res.status(502).json({ error: errorMessage(error) }); }
 });

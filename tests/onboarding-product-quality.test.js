@@ -117,6 +117,11 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(handler, /acquireSetupRequestLock/);
   assert.match(handler, /setupPendingRequests >= SETUP_MAX_PENDING_REQUESTS/);
   assert.match(setupRoutes, /router\.post\('\/setup', setupLimiter, express\.json\(\)/);
+  assert.match(handler, /await setupService\.saveValidatedConfig\(config\)/);
+  assert.doesNotMatch(handler, /await setupService\.saveConfig\(config\)/);
+  assert.match(setupService, /async saveValidatedConfig\(config: SetupConfig\)/);
+  assert.match(setupService, /const checks = await Promise\.all/);
+  assert.match(read('src/app/api/setup/v3/route.ts'), /AbortSignal\.timeout\(240_000\)/);
   assert.match(handler, /finally\s*\{\s*releaseSetupRequestLock\?\.\(\)/);
   assert.match(handler, /setupPendingRequests -= 1/);
   assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
@@ -174,6 +179,10 @@ test('first-run scan scheduling can be enabled later without restarting', () => 
   assert.ok(setupCheck > registration);
   assert.match(server, /if \(!await setupService\.isConfigured\(\)\) return/);
   assert.match(server, /await scanDocuments\(\)/);
+  const setupService = read('services/setupService.ts');
+  assert.match(setupService, /const persistedEnvironment = this\.readPersistedEnvironment\(\)/);
+  assert.match(setupService, /delete process\.env\[key\]/);
+  assert.match(setupService, /process\.env\[key\] = value/);
 });
 
 test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {
@@ -255,6 +264,14 @@ test('subscription sign-in routes are limited to the open initial setup window',
     read('src/components/settings/setup-wizard.tsx'),
     /Date\.now\(\) > deadline[\s\S]*codex\/login\/\$\{encodeURIComponent\(loginId\)\}\/cancel/
   );
+  const setupRoutes = read('routes/setup.ts');
+  assert.match(setupRoutes, /const codexLoginLimiter = createRateLimiter/);
+  assert.match(setupRoutes, /router\.post\('\/api\/codex\/login', allowDuringSetup, codexLoginLimiter/);
+  const codexAuth = read('services/codexAuthService.ts');
+  assert.match(codexAuth, /version: TAGVICO_VERSION/);
+  assert.doesNotMatch(codexAuth, /version: '3\.2\.0'/);
+  assert.match(codexAuth, /child\.kill\('SIGTERM'\)/);
+  assert.match(codexAuth, /child\.kill\('SIGKILL'\)/);
 });
 
 test('Docker release fixture keeps the mock document IDs used by acceptance', () => {

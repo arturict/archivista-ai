@@ -19,7 +19,9 @@ stored in that browser draft. New installations start in Review first mode
 with scheduled scans paused, then continue directly to Ask Tagvico. Enabling a
 schedule later in Settings takes effect without restarting the container.
 Abandoned ChatGPT device sign-ins expire server-side and release their Codex
-process so a later setup attempt can start cleanly.
+process before a rate-limited later attempt can start cleanly. Paperless
+permission checks run concurrently, and verified setup is persisted once so a
+slow but valid connection remains within the completion deadline.
 
 Ask Tagvico source titles now link to the permitted Paperless-backed document
 view. Authentication, rate-limit, and transient Paperless failures remain

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(payload),
       cache: 'no-store',
       redirect: 'manual',
-      signal: AbortSignal.timeout(120_000)
+      signal: AbortSignal.timeout(240_000)
     });
     return new Response(await response.text(), {
       status: response.status,

@@ -13,7 +13,7 @@
 - Watch the scan configuration before first-run setup completes, so enabling a
   schedule later in Settings takes effect without restarting the container.
 - Expire abandoned ChatGPT device sign-ins server-side, terminate their Codex
-  process, and allow a later setup attempt to start with a fresh challenge.
+  process before allowing another challenge, and rate-limit new login processes.
 - Let non-secret setup progress resume in the same browser tab while keeping
   API tokens, passwords, provider keys, and account credentials out of the
   browser draft.
@@ -22,6 +22,8 @@
 - Bound provider probe time, response bytes, catalog entries, concurrency,
   account sign-in, setup admission, and pending work so one failed or hostile
   endpoint cannot block later setup attempts.
+- Check Paperless permissions concurrently and persist the already verified
+  setup once, keeping the browser and backend on one completion deadline.
 
 ### Documents, answers, and recovery
 
