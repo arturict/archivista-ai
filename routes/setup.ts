@@ -4077,10 +4077,14 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
     );
     console.log('Setup request received:', redactedBody);
 
+    const effectiveSetupConfig = setupService.effectiveConfig(buildConfigForSave(req.body));
+    const effectivePaperlessUrl = String(effectiveSetupConfig.PAPERLESS_API_URL || '')
+      .replace(/\/api\/?$/i, '');
+    const effectivePaperlessToken = effectiveSetupConfig.PAPERLESS_API_TOKEN;
 
     // Initialize paperlessService with the new credentials
-    const paperlessApiUrl = paperlessUrl + '/api';
-    const initSuccess = await paperlessService.initializeWithCredentials(paperlessApiUrl, paperlessToken);
+    const paperlessApiUrl = effectivePaperlessUrl + '/api';
+    const initSuccess = await paperlessService.initializeWithCredentials(paperlessApiUrl, effectivePaperlessToken);
     
     if (!initSuccess) {
       return res.status(400).json({ 
@@ -4089,14 +4093,20 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
     }
 
     // Validate Paperless credentials
-    const isPaperlessValid = await setupService.validatePaperlessConfig(paperlessUrl, paperlessToken);
+    const isPaperlessValid = await setupService.validatePaperlessConfig(
+      effectivePaperlessUrl,
+      effectivePaperlessToken
+    );
     if (!isPaperlessValid) {
       return res.status(400).json({ 
         error: 'Paperless-ngx connection failed. Please check URL and Token.'
       });
     }
 
-    const isPermissionValid = await setupService.validateApiPermissions(paperlessUrl, paperlessToken);
+    const isPermissionValid = await setupService.validateApiPermissions(
+      effectivePaperlessUrl,
+      effectivePaperlessToken
+    );
     if (!isPermissionValid.success) {
       return res.status(400).json({
         error: 'Paperless-ngx API permissions are insufficient. Error: ' + isPermissionValid.message
@@ -4137,74 +4147,83 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
     }
 
     const providerConfig = normalizeProviderPayload(req.body);
+    const effectiveProvider = String(effectiveSetupConfig.AI_PROVIDER || providerConfig.provider);
 
-    if (providerConfig.provider === 'openrouter') {
+    if (effectiveProvider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
-        providerConfig.openrouterApiKey,
-        providerConfig.selectedModel,
-        injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerConfig.openrouterBaseUrl || undefined
+        effectiveSetupConfig.OPENROUTER_API_KEY,
+        effectiveSetupConfig.OPENROUTER_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OPENROUTER_BASE_URL || undefined
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenRouter connection failed. Please check the API key and selected model.'
         });
       }
-    } else if (providerConfig.provider === 'openai') {
+    } else if (effectiveProvider === 'openai') {
       const isValid = await setupService.validateOpenAIConfig(
-        providerConfig.openaiApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.OPENAI_API_KEY,
+        effectiveSetupConfig.OPENAI_MODEL || effectiveSetupConfig.AI_MODEL
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenAI connection failed. Please check the API key and selected model.'
         });
       }
-    } else if (providerConfig.provider === 'ollama') {
+    } else if (effectiveProvider === 'ollama') {
       const isValid = await setupService.validateOllamaConfig(
-        providerConfig.ollamaUrl,
-        providerConfig.selectedModel,
-        providerConfig.ollamaApiKey
+        effectiveSetupConfig.OLLAMA_API_URL,
+        effectiveSetupConfig.OLLAMA_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OLLAMA_API_KEY
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'Ollama connection failed. Please check URL and model.'
         });
       }
-    } else if (providerConfig.provider === 'ollama-cloud') {
-      const isValid = await setupService.validateOllamaConfig(providerConfig.ollamaCloudUrl, providerConfig.selectedModel, providerConfig.ollamaCloudApiKey);
+    } else if (effectiveProvider === 'ollama-cloud') {
+      const isValid = await setupService.validateOllamaConfig(
+        effectiveSetupConfig.OLLAMA_CLOUD_API_URL,
+        effectiveSetupConfig.OLLAMA_CLOUD_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OLLAMA_CLOUD_API_KEY
+      );
       if (!isValid) {
         return res.status(400).json({
           error: 'Ollama Cloud connection failed. Check the API key and cloud model.'
         });
       }
-    } else if (providerConfig.provider === 'opencode') {
+    } else if (effectiveProvider === 'opencode') {
       const isValid = await setupService.validateCustomConfig(
-        providerConfig.opencodeBaseUrl,
-        providerConfig.opencodeApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.OPENCODE_BASE_URL,
+        effectiveSetupConfig.OPENCODE_API_KEY,
+        effectiveSetupConfig.OPENCODE_MODEL || effectiveSetupConfig.AI_MODEL
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenCode Go connection failed. Check the service API key, gateway, and model ID.'
         });
       }
-    } else if (providerConfig.provider === 'copilot') {
+    } else if (effectiveProvider === 'copilot') {
       const status = await withSetupProviderTimeout<SetupProviderStatus>(
-        copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken })
+        copilotService.healthcheck({ gitHubToken: effectiveSetupConfig.COPILOT_GITHUB_TOKEN })
       ).catch((error): SetupProviderStatus => ({
         ok: false,
         models: [],
         error: errorMessage(error)
       }));
-      if (!status.ok || !status.models.includes(providerConfig.selectedModel)) {
+      if (!status.ok || !status.models.includes(
+        effectiveSetupConfig.COPILOT_MODEL || effectiveSetupConfig.AI_MODEL
+      )) {
         return res.status(400).json({
           error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`
         });
       }
-    } else if (providerConfig.provider === 'codex') {
+    } else if (effectiveProvider === 'codex') {
       try {
         const models = await codexAuthService.models();
-        if (!models.some((model: { id?: string }) => model.id === providerConfig.selectedModel)) {
+        if (!models.some((model: { id?: string }) => (
+          model.id === (effectiveSetupConfig.CODEX_MODEL || effectiveSetupConfig.AI_MODEL)
+        ))) {
           return res.status(400).json({
             error: 'ChatGPT subscription connection failed. Sign in again and choose an available model.'
           });
@@ -4214,23 +4233,23 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
           error: 'ChatGPT subscription connection failed. Complete device sign-in and retry.'
         });
       }
-    } else if (providerConfig.provider === 'compatible') {
+    } else if (effectiveProvider === 'compatible') {
       const isValid = await setupService.validateCustomConfig(
-        providerConfig.compatibleBaseUrl,
-        providerConfig.compatibleApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.COMPATIBLE_BASE_URL || effectiveSetupConfig.CUSTOM_BASE_URL,
+        effectiveSetupConfig.COMPATIBLE_API_KEY || effectiveSetupConfig.CUSTOM_API_KEY,
+        effectiveSetupConfig.COMPATIBLE_MODEL || effectiveSetupConfig.CUSTOM_MODEL || effectiveSetupConfig.AI_MODEL
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenAI-compatible connection failed. Please check base URL, key, and model.'
         });
       }
-    } else if (providerConfig.provider === 'azure') {
+    } else if (effectiveProvider === 'azure') {
       const isValid = await setupService.validateAzureConfig(
-        azureApiKey,
-        azureEndpoint,
-        azureDeploymentName,
-        azureApiVersion
+        effectiveSetupConfig.AZURE_API_KEY,
+        effectiveSetupConfig.AZURE_ENDPOINT,
+        effectiveSetupConfig.AZURE_DEPLOYMENT_NAME,
+        effectiveSetupConfig.AZURE_API_VERSION
       );
       if (!isValid) {
         return res.status(400).json({

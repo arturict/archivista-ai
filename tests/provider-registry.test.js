@@ -89,6 +89,59 @@ test('normalization keeps runtime ordering, defaults and unique model IDs', () =
   ]);
 });
 
+test('model discovery bounds response bytes and normalized catalog entries', async () => {
+  assert.equal(registry.normalizeModels(
+    Array.from({ length: 600 }, (_, index) => ({
+      id: `model-${index}`,
+      name: `Model ${index}`,
+      isDefault: false,
+      options: []
+    }))
+  ).length, 500);
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response('{}', {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(1024 * 1024 + 1)
+    }
+  });
+  try {
+    await assert.rejects(
+      () => registry.discoverOpenAIModels(
+        registry.getProviderDefinition('compatible'),
+        { COMPATIBLE_BASE_URL: 'http://provider.test/v1' }
+      ),
+      /response exceeds the 1048576-byte limit/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  global.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(1024 * 1024));
+      controller.enqueue(new Uint8Array(1));
+      controller.close();
+    }
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+  try {
+    await assert.rejects(
+      () => registry.discoverOpenAIModels(
+        registry.getProviderDefinition('compatible'),
+        { COMPATIBLE_BASE_URL: 'http://provider.test/v1' }
+      ),
+      /response exceeds the 1048576-byte limit/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('empty secret values retain the configured secret and provider fields map centrally', () => {
   assert.deepEqual(registry.providerValuesToEnvironment('compatible', {
     baseUrl: 'http://127.0.0.1:8317/v1',

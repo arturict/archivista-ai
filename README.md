@@ -111,7 +111,7 @@ require the separately hosted documentation site.
 1. **Start the container.** Run `docker compose up -d`, then open <http://localhost:8080/setup>.
 2. **Connect Paperless-ngx.** Paste its base URL and an API token (Paperless-ngx → Settings → My API token). Do not add `/api` to the URL. If Paperless runs on the Docker host, use `http://host.docker.internal:<port>` on Docker Desktop or the host's LAN IP on Linux. If both apps share a Docker network, use the Paperless service name.
 3. **Choose a model provider.** Pick OpenRouter for the fastest curated start, Ollama to keep everything on your own hardware, or any other supported provider (see below). Add the required key or endpoint.
-4. **Choose the write mode and fields.** Pick **Review first** to queue every suggestion for approval, or **Automatic** to let Tagvico write validated metadata directly as it did before. Then choose tags, title, correspondent, document type, custom fields, and optional owner assignment. You can switch modes later without restarting Tagvico.
+4. **Create the owner and review the safe start.** Setup starts new installations in **Review first** mode with scheduled scans paused. After sign-in, open **Settings** to choose writable fields, enable a schedule, or switch metadata filing to **Automatic** when representative documents have been verified. Ask Tagvico writes always remain approval-gated.
 
 The first run creates a tiny local admin account, stored in the SQLite database inside the persistent volume.
 

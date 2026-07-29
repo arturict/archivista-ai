@@ -27,7 +27,10 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   assert.doesNotMatch(wizard, /discovered\[0\]\.id/);
   assert.match(wizard, /if \(probeId !== providerProbeId\.current\) return/);
   assert.match(read('routes/setup.ts'), /codexAuthService\.models\(\)/);
-  assert.match(read('routes/setup.ts'), /status\.models\.includes\(providerConfig\.selectedModel\)/);
+  assert.match(
+    read('routes/setup.ts'),
+    /status\.models\.includes\(\s*effectiveSetupConfig\.COPILOT_MODEL \|\| effectiveSetupConfig\.AI_MODEL/
+  );
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
@@ -41,6 +44,7 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
 test('provider probe validates the selected model and supports catalog-less compatible runtimes', () => {
   const route = read('src/app/api/setup/v3/provider-probe/route.ts');
   const validation = read('services/providerSetupValidation.ts');
+  const providerRegistry = read('services/providerRegistry.ts');
   const setupService = read('services/setupService.ts');
   const setupRoutes = read('routes/setup.ts');
   const acceptance = read('scripts/release-acceptance.mjs');
@@ -48,6 +52,9 @@ test('provider probe validates the selected model and supports catalog-less comp
 
   assert.match(route, /modelId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(200\)\.optional\(\)/);
   assert.match(route, /PROBE_MAX_CONCURRENT = 3/);
+  assert.match(providerRegistry, /MAX_DISCOVERY_RESPONSE_BYTES = 1024 \* 1024/);
+  assert.match(providerRegistry, /MAX_DISCOVERY_MODELS = 500/);
+  assert.match(providerRegistry, /readBoundedResponse\(response\)/);
   assert.match(route, /releaseAdmission = acquireProbeAdmission\(\)/);
   assert.match(route, /finally\s*\{\s*releaseAdmission\?\.\(\)/);
   assert.match(route, /validateProviderSetupModel\(input\.instanceId, values, input\.modelId\)/);
@@ -78,7 +85,7 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /message\?\.tool_calls/);
   assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
   assert.match(setupService, /selectedModel \|\| process\.env\.OPENAI_MODEL/);
-  assert.match(setupRoutes, /validateOpenAIConfig\(\s*providerConfig\.openaiApiKey,\s*providerConfig\.selectedModel/);
+  assert.match(setupRoutes, /validateOpenAIConfig\(\s*effectiveSetupConfig\.OPENAI_API_KEY,\s*effectiveSetupConfig\.OPENAI_MODEL/);
   assert.match(setupRoutes, /withSetupProviderTimeout(?:<SetupProviderStatus>)?\(\s*copilotService\.healthcheck/);
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
   assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
@@ -134,9 +141,13 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   );
   assert.match(handler, /Initial setup remains open for retry/);
   assert.match(read('services/paperlessService.ts'), /timeout: PAPERLESS_REQUEST_TIMEOUT_MS/);
-  assert.match(setupRoutes, /injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerConfig\.openrouterBaseUrl/);
+  assert.match(setupRoutes, /const effectiveSetupConfig = setupService\.effectiveConfig\(buildConfigForSave\(req\.body\)\)/);
+  assert.match(setupRoutes, /effectiveSetupConfig\.PAPERLESS_API_TOKEN/);
+  assert.match(setupRoutes, /effectiveSetupConfig\.OPENROUTER_API_KEY/);
   assert.match(setupRoutes, /OPENROUTER_BASE_URL: injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerPayload\.openrouterBaseUrl/);
   assert.match(setupService, /injectedEnvironmentValue\(name: string\)/);
+  assert.match(setupService, /effectiveConfig\(config: SetupConfig\)/);
+  assert.match(setupService, /config = this\.effectiveConfig\(config\)/);
   assert.match(setupService, /runtimeConfig\.injectedEnvironment = injectedEnvironment/);
   assert.match(setupRoutes, /OLLAMA_API_KEY: providerPayload\.provider === 'ollama'/);
   assert.match(setupRoutes, /providerConfig\.ollamaApiKey \|\| currentConfig\.OLLAMA_API_KEY/);

@@ -8,13 +8,16 @@
   authentication, model discovery, and exact selected-model verification.
 - Prefill built-in endpoints, support authenticated Ollama installations, and
   keep local and cloud Ollama credentials separate at validation and runtime.
+- Validate Docker- and host-injected connection values as the effective runtime
+  configuration, even when a stale browser value is submitted.
 - Let non-secret setup progress resume in the same browser tab while keeping
   API tokens, passwords, provider keys, and account credentials out of the
   browser draft.
 - Start new installations in Review first mode with scheduled scans paused, and
   take a successful setup directly to Ask Tagvico for the first useful question.
-- Bound provider probes, account sign-in, network operations, setup admission,
-  and pending work so one failed attempt cannot block later setup attempts.
+- Bound provider probe time, response bytes, catalog entries, concurrency,
+  account sign-in, setup admission, and pending work so one failed or hostile
+  endpoint cannot block later setup attempts.
 
 ### Documents, answers, and recovery
 

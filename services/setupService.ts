@@ -325,6 +325,7 @@ class SetupService {
   }
 
   async validateConfig(config: SetupConfig): Promise<boolean> {
+    config = this.effectiveConfig(config);
     // Validate Paperless config
     const paperlessApiUrl = config.PAPERLESS_API_URL.replace(/\/api/g, '');
     const paperlessValid = await this.validatePaperlessConfig(
@@ -507,6 +508,15 @@ class SetupService {
   injectedEnvironmentValue(name: string): string | undefined {
     const value = String(process.env[name] || '').trim();
     return this.injectedEnvironmentKeys.has(name) && value ? value : undefined;
+  }
+
+  effectiveConfig(config: SetupConfig): SetupConfig {
+    const effective = { ...config };
+    for (const key of this.injectedEnvironmentKeys) {
+      const value = this.injectedEnvironmentValue(key);
+      if (value !== undefined) effective[key] = value;
+    }
+    return effective;
   }
 
   async isConfigured() {

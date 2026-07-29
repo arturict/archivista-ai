@@ -9,6 +9,9 @@ blind saves. Guided setup checks Paperless access, authenticates the selected
 provider, loads its live model catalog, and verifies the exact model before
 creating the owner. Built-in endpoints are prefilled and authenticated Ollama
 endpoints work without mixing local and cloud credentials.
+Docker- and host-injected connection values are verified as the effective
+runtime configuration. Public model discovery also limits response bytes,
+catalog entries, time, and concurrency.
 
 Non-secret setup progress can resume in the same tab after an interruption.
 Paperless tokens, passwords, provider keys, and account credentials are never
