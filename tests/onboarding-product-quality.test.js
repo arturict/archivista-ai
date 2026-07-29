@@ -69,7 +69,8 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /hasSupportedSetupArguments/);
   assert.match(setupService, /record\.supported === true/);
   assert.match(setupService, /split\('\/'\)\.at\(-1\)/);
-  assert.match(setupService, /SETUP_TOOL_TOKEN_BUDGET = 2048/);
+  assert.match(setupService, /SETUP_TOOL_REASONING_TOKEN_BUDGET = 2048/);
+  assert.match(setupService, /SETUP_TOOL_STANDARD_TOKEN_BUDGET = 64/);
   assert.match(setupService, /reasoning_effort: 'low'/);
   assert.match(setupService, /\{ forceCompletionTokens: true \}/);
   assert.match(setupService, /max_completion_tokens\|unsupported/);
@@ -137,6 +138,9 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(setupRoutes, /OPENROUTER_BASE_URL: injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerPayload\.openrouterBaseUrl/);
   assert.match(setupService, /injectedEnvironmentValue\(name: string\)/);
   assert.match(setupService, /runtimeConfig\.injectedEnvironment = injectedEnvironment/);
+  assert.match(setupRoutes, /OLLAMA_API_KEY: providerPayload\.provider === 'ollama'/);
+  assert.match(setupRoutes, /providerConfig\.ollamaApiKey \|\| currentConfig\.OLLAMA_API_KEY/);
+  assert.match(setupRoutes, /'OLLAMA_API_KEY'/);
 });
 
 test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {
@@ -174,6 +178,8 @@ test('first success opens Ask Tagvico and research sources link to document view
   assert.match(companion, /Tagvico will wait for approval before changing anything/);
   assert.match(documentSource, /requireUser\(\)/);
   assert.match(documentSource, /getPaperlessDocument/);
+  assert.match(documentSource, /axios\.isAxiosError\(error\) && error\.response\?\.status === 404/);
+  assert.match(documentSource, /throw error/);
   assert.match(documentSource, /notFound\(\)/);
   assert.match(documentSource, /This view is read-only/);
 });

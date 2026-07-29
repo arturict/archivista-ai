@@ -190,6 +190,7 @@ function normalizeProviderPayload(payload: ConfigLike = {}) {
     openrouterApiKey: payload.openrouterApiKey || payload.OPENROUTER_API_KEY || payload.openaiKey || payload.OPENAI_API_KEY || '',
     openrouterBaseUrl: payload.openrouterBaseUrl || payload.OPENROUTER_BASE_URL || '',
     ollamaUrl: payload.ollamaUrl || payload.OLLAMA_API_URL || 'http://localhost:11434',
+    ollamaApiKey: payload.ollamaApiKey || payload.OLLAMA_API_KEY || '',
     ollamaCloudUrl: payload.ollamaCloudUrl || payload.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
     ollamaCloudApiKey: payload.ollamaCloudApiKey || payload.OLLAMA_CLOUD_API_KEY || payload.OLLAMA_API_KEY || '',
     opencodeBaseUrl: payload.opencodeBaseUrl || payload.OPENCODE_BASE_URL || 'https://opencode.ai/zen/go/v1',

@@ -10,7 +10,8 @@ const { normalizeProvider } = require('./providerCatalogService');
 type SetupConfig = Record<string, string>;
 const SETUP_VALIDATION_TIMEOUT_MS = 15_000;
 const SETUP_TOOL_NAME = 'confirm_tagvico_tool_support';
-const SETUP_TOOL_TOKEN_BUDGET = 2048;
+const SETUP_TOOL_REASONING_TOKEN_BUDGET = 2048;
+const SETUP_TOOL_STANDARD_TOKEN_BUDGET = 64;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -21,10 +22,10 @@ function isReasoningModel(model: string) {
   return /^(?:gpt-5|o\d)/i.test(unqualifiedModel);
 }
 
-function tokenLimitParam(model: string, value: number, forceCompletionTokens = false) {
+function tokenLimitParam(model: string, forceCompletionTokens = false) {
   return forceCompletionTokens || isReasoningModel(model)
-    ? { max_completion_tokens: value }
-    : { max_tokens: value };
+    ? { max_completion_tokens: SETUP_TOOL_REASONING_TOKEN_BUDGET }
+    : { max_tokens: SETUP_TOOL_STANDARD_TOKEN_BUDGET };
 }
 
 function toolValidationRequest(
@@ -55,7 +56,7 @@ function toolValidationRequest(
       type: 'function' as const,
       function: { name: SETUP_TOOL_NAME }
     },
-    ...tokenLimitParam(model, SETUP_TOOL_TOKEN_BUDGET, options.forceCompletionTokens),
+    ...tokenLimitParam(model, options.forceCompletionTokens),
     ...(reasoningModel && options.reasoningEffort ? { reasoning_effort: 'low' as const } : {})
   };
 }

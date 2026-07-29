@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, FileText, MessageSquareText } from 'lucide-react';
+import axios from 'axios';
 import { requireUser } from '@/lib/server/auth';
 import { workspaceFor } from '@/lib/server/workspace';
 import * as actionSync from '@root/services/actionSyncService';
@@ -26,8 +27,9 @@ export default async function DocumentSourcePage({
   let document: Record<string, unknown>;
   try {
     document = await actionSync.getPaperlessDocument(workspace.householdId, workspace.memberId, rawId);
-  } catch {
-    notFound();
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) notFound();
+    throw error;
   }
 
   const title = String(document.title || `Document #${rawId}`);

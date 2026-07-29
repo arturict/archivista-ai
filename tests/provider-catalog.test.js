@@ -37,6 +37,7 @@ test('provider payload keeps OpenCode, Copilot, and Ollama Cloud credentials sep
     openrouterApiKey: '',
     openrouterBaseUrl: '',
     ollamaUrl: 'http://localhost:11434',
+    ollamaApiKey: '',
     ollamaCloudUrl: 'https://ollama.com',
     ollamaCloudApiKey: '',
     opencodeBaseUrl: 'https://console.example/v1',
@@ -51,6 +52,11 @@ test('provider payload keeps OpenCode, Copilot, and Ollama Cloud credentials sep
     azureDeploymentName: '',
     azureApiVersion: ''
   });
+  const ollama = helpers.normalizeProviderPayload({
+    aiProvider: 'ollama',
+    OLLAMA_API_KEY: 'local_ollama_key'
+  });
+  assert.equal(ollama.ollamaApiKey, 'local_ollama_key');
 });
 
 test('provider payload preserves a custom OpenRouter base URL', () => {

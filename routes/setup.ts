@@ -2079,6 +2079,7 @@ function buildConfigForSave(payload: Record<string, RequestValue>, options: Save
     CODEX_MODEL: providerPayload.provider === 'codex' ? providerPayload.selectedModel : currentConfig.CODEX_MODEL || 'gpt-5.4-mini',
     AI_PROCESSING_MODE: ['standard', 'flex', 'batch'].includes(String(payload.aiProcessingMode)) ? String(payload.aiProcessingMode) : (currentConfig.AI_PROCESSING_MODE || 'standard'),
     OLLAMA_API_URL: providerPayload.ollamaUrl || currentConfig.OLLAMA_API_URL || 'http://localhost:11434',
+    OLLAMA_API_KEY: providerPayload.provider === 'ollama' ? providerPayload.ollamaApiKey : currentConfig.OLLAMA_API_KEY || '',
     OLLAMA_MODEL: providerPayload.provider === 'ollama' ? providerPayload.selectedModel : currentConfig.OLLAMA_MODEL || 'llama3.2',
     OLLAMA_CLOUD_API_KEY: providerPayload.provider === 'ollama-cloud' ? providerPayload.ollamaCloudApiKey : currentConfig.OLLAMA_CLOUD_API_KEY || '',
     OLLAMA_CLOUD_API_URL: providerPayload.ollamaCloudUrl || currentConfig.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
@@ -4044,15 +4045,27 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
     // Log setup request with sensitive data redacted
     const sensitiveKeys = [
       'paperlessToken',
+      'PAPERLESS_API_TOKEN',
       'openaiKey',
+      'OPENAI_API_KEY',
       'openrouterApiKey',
+      'OPENROUTER_API_KEY',
+      'ollamaApiKey',
+      'OLLAMA_API_KEY',
       'ollamaCloudApiKey',
+      'OLLAMA_CLOUD_API_KEY',
       'opencodeApiKey',
+      'OPENCODE_API_KEY',
       'copilotGitHubToken',
+      'COPILOT_GITHUB_TOKEN',
       'compatibleApiKey',
+      'COMPATIBLE_API_KEY',
       'customApiKey',
+      'CUSTOM_API_KEY',
       'anthropicApiKey',
+      'ANTHROPIC_API_KEY',
       'azureApiKey',
+      'AZURE_API_KEY',
       'password',
       'confirmPassword'
     ];
@@ -4147,7 +4160,11 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
         });
       }
     } else if (providerConfig.provider === 'ollama') {
-      const isValid = await setupService.validateOllamaConfig(providerConfig.ollamaUrl, providerConfig.selectedModel);
+      const isValid = await setupService.validateOllamaConfig(
+        providerConfig.ollamaUrl,
+        providerConfig.selectedModel,
+        providerConfig.ollamaApiKey
+      );
       if (!isValid) {
         return res.status(400).json({
           error: 'Ollama connection failed. Please check URL and model.'
@@ -4559,7 +4576,8 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
     } else if (providerConfig.provider === 'ollama') {
       const isValid = await setupService.validateOllamaConfig(
         providerConfig.ollamaUrl || currentConfig.OLLAMA_API_URL,
-        providerConfig.selectedModel || currentConfig.OLLAMA_MODEL
+        providerConfig.selectedModel || currentConfig.OLLAMA_MODEL,
+        providerConfig.ollamaApiKey || currentConfig.OLLAMA_API_KEY
       );
       if (!isValid) {
         return res.status(400).json({
