@@ -67,6 +67,10 @@ the image you pinned even when the public website changes.
    explicit approval. Enable a schedule or Automatic metadata filing only
    after validating representative documents.
 
+After setup succeeds, remove `ALLOW_REMOTE_SETUP` from the Compose file and run
+`docker compose up -d` again. Compose recreates the container with remote setup
+locked down, while the named volume keeps your configuration and data.
+
 After saving the provider, inspect the detailed application health response.
 Unlike `/health`, this endpoint reports the configured model adapter's health
 when that adapter exposes a health check:

@@ -12,6 +12,8 @@
   configuration, even when a stale browser value is submitted.
 - Watch the scan configuration before first-run setup completes, so enabling a
   schedule later in Settings takes effect without restarting the container.
+- Expire abandoned ChatGPT device sign-ins server-side, terminate their Codex
+  process, and allow a later setup attempt to start with a fresh challenge.
 - Let non-secret setup progress resume in the same browser tab while keeping
   API tokens, passwords, provider keys, and account credentials out of the
   browser draft.

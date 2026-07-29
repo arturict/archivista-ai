@@ -3,9 +3,24 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-type LoginState = { loginId: string; completed: boolean; cancelled?: boolean; output: string; error?: string; startedAt: string };
+type LoginState = {
+  loginId: string;
+  completed: boolean;
+  cancelled?: boolean;
+  output: string;
+  error?: string;
+  startedAt: string;
+};
+type ManagedLoginState = LoginState & {
+  child?: ReturnType<typeof spawn>;
+  expiryTimer?: NodeJS.Timeout;
+};
 const appConfig = { codex: { home: process.env.CODEX_HOME || 'data/codex', model: process.env.CODEX_MODEL || 'gpt-5.4-mini' } };
 const ANSI = /\u001b\[[0-9;]*m/g;
+const CODEX_LOGIN_TIMEOUT_MS = Math.min(
+  15 * 60 * 1000,
+  Math.max(50, Number.parseInt(process.env.CODEX_LOGIN_TIMEOUT_MS || '300000', 10) || 300000)
+);
 const CHILD_ENVIRONMENT_KEYS = [
   'PATH',
   'HOME',
@@ -53,7 +68,7 @@ function command() {
 }
 
 class CodexAuthService {
-  private logins = new Map<string, LoginState & { child?: ReturnType<typeof spawn> }>();
+  private logins = new Map<string, ManagedLoginState>();
   environment() {
     fs.mkdirSync(/*turbopackIgnore: true*/ appConfig.codex.home, { recursive: true, mode: 0o700 });
     const environment: NodeJS.ProcessEnv = {
@@ -160,19 +175,61 @@ class CodexAuthService {
     const active = Array.from(this.logins.values()).find((entry) => !entry.completed);
     if (active) return this.view(active);
     const loginId = crypto.randomUUID(); const executable = command();
-    const state: LoginState & { child?: ReturnType<typeof spawn> } = { loginId, completed: false, output: '', startedAt: new Date().toISOString() };
+    const state: ManagedLoginState = { loginId, completed: false, output: '', startedAt: new Date().toISOString() };
     const child = spawn(executable.file, [...executable.prefix, 'login', '--device-auth'], { env: this.environment(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     state.child = child; this.logins.set(loginId, state);
     const append = (chunk: unknown) => { state.output = `${state.output}${String(chunk).replace(ANSI, '')}`.slice(-12_000); };
     child.stdout.on('data', append); child.stderr.on('data', append);
-    child.once('error', (error) => { state.error = error.message; state.completed = true; delete state.child; });
-    child.once('exit', (code, signal) => { if (code !== 0 && !state.cancelled) state.error = `Codex login exited (${code ?? signal ?? 'unknown'})`; state.completed = true; delete state.child; });
+    const clearExpiry = () => {
+      if (state.expiryTimer) clearTimeout(state.expiryTimer);
+      delete state.expiryTimer;
+    };
+    child.once('error', (error) => {
+      clearExpiry();
+      state.error = error.message;
+      state.completed = true;
+      delete state.child;
+    });
+    child.once('exit', (code, signal) => {
+      clearExpiry();
+      if (code !== 0 && !state.cancelled) state.error = `Codex login exited (${code ?? signal ?? 'unknown'})`;
+      state.completed = true;
+      delete state.child;
+    });
+    state.expiryTimer = setTimeout(() => {
+      if (state.completed) return;
+      state.cancelled = true;
+      state.completed = true;
+      state.error = 'ChatGPT device sign-in expired. Start a new sign-in.';
+      const activeChild = state.child;
+      delete state.child;
+      delete state.expiryTimer;
+      activeChild?.kill('SIGTERM');
+    }, CODEX_LOGIN_TIMEOUT_MS);
+    state.expiryTimer.unref?.();
     return this.view(state);
   }
   private view(state: LoginState) { return { loginId: state.loginId, completed: state.completed, cancelled: state.cancelled || false, output: state.output, error: state.error || null, startedAt: state.startedAt }; }
   loginStatus(loginId: string) { const state = this.logins.get(loginId); return state ? this.view(state) : null; }
-  async cancel(loginId: string) { const state = this.logins.get(loginId); if (!state) return { success: false }; state.cancelled = true; state.completed = true; state.child?.kill('SIGTERM'); delete state.child; return { success: true, ...this.view(state) }; }
-  async logout() { await this.run(['logout']); this.logins.clear(); return { success: true }; }
+  async cancel(loginId: string) {
+    const state = this.logins.get(loginId);
+    if (!state) return { success: false };
+    if (state.expiryTimer) clearTimeout(state.expiryTimer);
+    delete state.expiryTimer;
+    state.cancelled = true;
+    state.completed = true;
+    state.child?.kill('SIGTERM');
+    delete state.child;
+    return { success: true, ...this.view(state) };
+  }
+  async logout() {
+    await this.run(['logout']);
+    for (const state of this.logins.values()) {
+      if (!state.completed) await this.cancel(state.loginId);
+    }
+    this.logins.clear();
+    return { success: true };
+  }
 }
 
 const codexAuthService = new CodexAuthService();

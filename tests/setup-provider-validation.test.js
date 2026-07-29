@@ -64,6 +64,12 @@ test('Ollama setup accepts only a verified tool call from the selected model', a
 });
 
 test('Azure setup retries operator-defined reasoning-style deployments with max_tokens', async (t) => {
+  const previousOpenAIBaseUrl = process.env.OPENAI_BASE_URL;
+  delete process.env.OPENAI_BASE_URL;
+  t.after(() => {
+    if (previousOpenAIBaseUrl === undefined) delete process.env.OPENAI_BASE_URL;
+    else process.env.OPENAI_BASE_URL = previousOpenAIBaseUrl;
+  });
   const requests = [];
   const server = http.createServer((request, response) => {
     let body = '';
