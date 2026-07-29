@@ -54,6 +54,10 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/package-lock.json ./package-lock.json
 COPY --from=build /app/next.config.ts ./next.config.ts
 COPY --from=build /app/dist ./dist
+# swagger-jsdoc reads these TypeScript sources when the backend starts.
+COPY --from=build /app/server.ts ./server.ts
+COPY --from=build /app/schemas.ts ./schemas.ts
+COPY --from=build /app/routes ./routes
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/views ./views

@@ -48,7 +48,10 @@ jobs:
                     run_full=true
                     ;;
                 esac
-              done < <(git diff --name-only -z "$BASE_SHA" "$GITHUB_SHA")
+              # Disable rename detection so a product file renamed into an
+              # allowlisted metadata path is still reported as a deletion and
+              # an addition. Either side then forces the full gate.
+              done < <(git diff --no-renames --name-only -z "$BASE_SHA" "$GITHUB_SHA")
               [[ "$changed" == "true" ]] || run_full=true
             fi
           fi

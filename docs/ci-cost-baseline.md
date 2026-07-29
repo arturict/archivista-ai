@@ -92,8 +92,8 @@ expire naturally. After the new default-branch cache has been created and
 verified, a repository owner may reclaim the two measured tag scopes with:
 
 ```bash
-gh cache delete --all --ref refs/heads/refs/tags/v3.2.0 --repo arturict/tagvico-ai
-gh cache delete --all --ref refs/heads/refs/tags/v3.2.5 --repo arturict/tagvico-ai
+gh cache delete --all --ref refs/tags/v3.2.0 --repo arturict/tagvico-ai
+gh cache delete --all --ref refs/tags/v3.2.5 --repo arturict/tagvico-ai
 ```
 
 These commands are intentionally manual and must not run from pull request
