@@ -1,5 +1,40 @@
 # Release notes
 
+## v3.2.5
+
+Released 29 July 2026.
+
+Tagvico 3.2.5 turns the first run into a verified path instead of a sequence of
+blind saves. Guided setup checks Paperless access, authenticates the selected
+provider, loads its live model catalog, and verifies the exact model before
+creating the owner. Built-in endpoints are prefilled and authenticated Ollama
+endpoints work without mixing local and cloud credentials.
+
+Non-secret setup progress can resume in the same tab after an interruption.
+Paperless tokens, passwords, provider keys, and account credentials are never
+stored in that browser draft. New installations start in Review first mode
+with scheduled scans paused, then continue directly to Ask Tagvico.
+
+Ask Tagvico source titles now link to the permitted Paperless-backed document
+view. Authentication, rate-limit, and transient Paperless failures remain
+retryable instead of appearing as missing documents. Setup, Documents, Ask
+Tagvico, Activity, and Settings also have clearer loading, empty, retry, and
+narrow-screen states.
+
+The landing page now separates aggregate request totals from explicitly opted-in
+installation reports. The first-party design uses no cookies, fingerprints,
+referrers, stored IP addresses, or permanent installation identifiers. It
+respects Global Privacy Control and Do Not Track and suppresses small
+installation totals.
+
+Release acceptance covers setup, synthetic document upload, search, cited
+answers, tag changes, approval-first actions, cleanup, and recovery against an
+isolated real Paperless-ngx 2.20.15 container.
+
+Upgrade by backing up `tagvico_ai_data`, pinning
+`ghcr.io/arturict/tagvico-ai:3.2.5`, and recreating only the Tagvico container.
+This is a v3 patch with no data migration.
+
 ## v3.2.0
 
 Released 26 July 2026.

@@ -150,9 +150,9 @@ forever.
 ## In-product changelog
 
 **What’s new** in the sidebar opens the release notes bundled with the running
-instance. The top entry is the prepared v3.2.0 changelog, followed by the
-complete v3.1 history. It stays marked as unreleased until the release image
-and tag are actually published.
+instance. The top entry is the released v3.2.5 changelog, followed by v3.2.0
+and the complete v3.1 history. An entry stays marked as unreleased until its
+image and tag are actually published.
 
 ## Subscription-backed model access
 
