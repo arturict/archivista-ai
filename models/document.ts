@@ -1319,6 +1319,11 @@ const documentModel = {
     }
   },
 
+  async hasAnyUser() {
+    const existing = db.prepare('SELECT 1 AS present FROM users LIMIT 1').get();
+    return Boolean(existing);
+  },
+
   async getProcessingTimeStats() {
     try {
       return db.prepare(`

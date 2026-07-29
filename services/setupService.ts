@@ -10,18 +10,28 @@ const { normalizeProvider } = require('./providerCatalogService');
 type SetupConfig = Record<string, string>;
 const SETUP_VALIDATION_TIMEOUT_MS = 15_000;
 const SETUP_TOOL_NAME = 'confirm_tagvico_tool_support';
+const SETUP_TOOL_TOKEN_BUDGET = 2048;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function tokenLimitParam(model: string, value: number) {
-  return /^(?:gpt-5|o\d)/i.test(model || '')
+function isReasoningModel(model: string) {
+  const unqualifiedModel = String(model || '').split('/').at(-1) || '';
+  return /^(?:gpt-5|o\d)/i.test(unqualifiedModel);
+}
+
+function tokenLimitParam(model: string, value: number, forceCompletionTokens = false) {
+  return forceCompletionTokens || isReasoningModel(model)
     ? { max_completion_tokens: value }
     : { max_tokens: value };
 }
 
-function toolValidationRequest(model: string) {
+function toolValidationRequest(
+  model: string,
+  options: { forceCompletionTokens?: boolean; reasoningEffort?: boolean } = {}
+) {
+  const reasoningModel = isReasoningModel(model);
   return {
     model,
     messages: [{
@@ -45,7 +55,8 @@ function toolValidationRequest(model: string) {
       type: 'function' as const,
       function: { name: SETUP_TOOL_NAME }
     },
-    ...tokenLimitParam(model, 32)
+    ...tokenLimitParam(model, SETUP_TOOL_TOKEN_BUDGET, options.forceCompletionTokens),
+    ...(reasoningModel && options.reasoningEffort ? { reasoning_effort: 'low' as const } : {})
   };
 }
 
@@ -151,7 +162,10 @@ class SetupService {
       try {
         const openai = new OpenAI({ apiKey, timeout: SETUP_VALIDATION_TIMEOUT_MS });
         const model = selectedModel || process.env.OPENAI_MODEL || 'gpt-5.4-nano';
-        const response = await openai.chat.completions.create(toolValidationRequest(model));
+        const response = await openai.chat.completions.create(toolValidationRequest(
+          model,
+          { reasoningEffort: true }
+        ));
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
@@ -184,7 +198,10 @@ class SetupService {
         }
       });
 
-      const response = await openai.chat.completions.create(toolValidationRequest(model));
+      const response = await openai.chat.completions.create(toolValidationRequest(
+        model,
+        { reasoningEffort: true }
+      ));
 
       return hasSetupToolCall(response);
     } catch (error) {
@@ -280,7 +297,20 @@ class SetupService {
           apiVersion,
           timeout: SETUP_VALIDATION_TIMEOUT_MS
         });
-        const response = await openai.chat.completions.create(toolValidationRequest(deploymentName));
+        // Azure deployment names are operator-defined and need not reveal the
+        // underlying reasoning-model family.
+        let response;
+        try {
+          response = await openai.chat.completions.create(toolValidationRequest(
+            deploymentName,
+            { forceCompletionTokens: true }
+          ));
+        } catch (error) {
+          if (!/max_completion_tokens|unsupported (?:parameter|argument)|unknown (?:parameter|argument)/i.test(errorMessage(error))) {
+            throw error;
+          }
+          response = await openai.chat.completions.create(toolValidationRequest(deploymentName));
+        }
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
@@ -461,13 +491,20 @@ class SetupService {
   }
 
   reloadRuntimeConfig() {
+    const injectedEnvironment = runtimeConfig.injectedEnvironment;
     const configPath = require.resolve('../config/config');
     delete require.cache[configPath];
     const freshConfig = require('../config/config');
     Object.keys(runtimeConfig).forEach((key) => delete runtimeConfig[key]);
     Object.assign(runtimeConfig, freshConfig);
+    runtimeConfig.injectedEnvironment = injectedEnvironment;
     const cachedModule = require.cache[configPath];
     if (cachedModule) cachedModule.exports = runtimeConfig;
+  }
+
+  injectedEnvironmentValue(name: string): string | undefined {
+    const value = String(process.env[name] || '').trim();
+    return this.injectedEnvironmentKeys.has(name) && value ? value : undefined;
   }
 
   async isConfigured() {

@@ -29,7 +29,7 @@ interface Res {
   status(code: number): Res;
   write(chunk: string): boolean;
 }
-type Next = () => unknown;
+type Next = (error?: unknown) => unknown;
 const router = express.Router();
 const axios = require('axios');
 const setupService = require('../services/setupService.js');
@@ -101,6 +101,8 @@ const errorCode = (error: unknown): string | undefined => {
 };
 const firstString = (value: RequestValue | string | string[]): string | undefined =>
   typeof value === 'string' ? value : Array.isArray(value) && typeof value[0] === 'string' ? value[0] : undefined;
+const injectedEnvironmentValue = (name: string): string | undefined =>
+  setupService.injectedEnvironmentValue(name);
 const {
   buildUiConfig,
   normalizeArray,
@@ -243,8 +245,7 @@ declare let runningTask: boolean;
 async function recoverCompletedSetup(): Promise<boolean> {
   const configured = await setupService.isConfigured();
   if (configured) return true;
-  const existingOwners = await documentModel.getUsers();
-  if (!existingOwners.length) return false;
+  if (!await documentModel.hasAnyUser()) return false;
   // Owner creation is the final durable setup step. If the process exited
   // before the marker write, close setup before routing the returning owner.
   await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
@@ -255,7 +256,13 @@ async function recoverCompletedSetup(): Promise<boolean> {
 router.use(async (req: Req, res: Res, next: Next) => {
   const token = req.cookies.jwt || firstString(req.headers.authorization)?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
-  const configured = await recoverCompletedSetup();
+  let configured: boolean;
+  try {
+    configured = await recoverCompletedSetup();
+  } catch (error) {
+    console.error('Could not recover interrupted setup:', error);
+    return next(error);
+  }
 
   if (req.path.startsWith('/setup')) {
     const local = isLocalProxyRequest({ remoteAddress: req.socket?.remoteAddress, forwardedFor: firstString(req.headers['x-forwarded-for']) });
@@ -2063,7 +2070,7 @@ function buildConfigForSave(payload: Record<string, RequestValue>, options: Save
     USE_EXISTING_DATA: parseBooleanFlag(payload.useExistingData, currentConfig.USE_EXISTING_DATA || 'no'),
     DISABLE_AUTOMATIC_PROCESSING: parseBooleanFlag(payload.disableAutomaticProcessing, currentConfig.DISABLE_AUTOMATIC_PROCESSING || 'no'),
     OPENROUTER_API_KEY: providerPayload.openrouterApiKey || currentConfig.OPENROUTER_API_KEY || '',
-    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || providerPayload.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    OPENROUTER_BASE_URL: injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerPayload.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
     OPENROUTER_MODEL: providerPayload.provider === 'openrouter' ? providerPayload.selectedModel : currentConfig.OPENROUTER_MODEL || providerPayload.selectedModel,
     OPENAI_API_KEY: providerPayload.provider === 'openai' ? providerPayload.openaiApiKey : currentConfig.OPENAI_API_KEY || '',
     OPENAI_MODEL: providerPayload.provider === 'openai' ? providerPayload.selectedModel : currentConfig.OPENAI_MODEL || 'gpt-5.4-mini',
@@ -3987,8 +3994,7 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
         error: 'Setup has already been completed. Sign in to change settings.'
       });
     }
-    const existingOwners = await documentModel.getUsers();
-    if (existingOwners.length > 0) {
+    if (await documentModel.hasAnyUser()) {
       // Recover the only crash window between owner creation and the final
       // setup marker. Never accept another public setup payload in this state.
       await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
@@ -4123,7 +4129,7 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
       const isValid = await setupService.validateOpenRouterConfig(
         providerConfig.openrouterApiKey,
         providerConfig.selectedModel,
-        process.env.OPENROUTER_BASE_URL || providerConfig.openrouterBaseUrl || undefined
+        injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerConfig.openrouterBaseUrl || undefined
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4533,7 +4539,7 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
       const isValid = await setupService.validateOpenRouterConfig(
         providerConfig.openrouterApiKey,
         providerConfig.selectedModel,
-        process.env.OPENROUTER_BASE_URL || providerConfig.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || undefined
+        injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerConfig.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || undefined
       );
       if (!isValid) {
         return res.status(400).json({

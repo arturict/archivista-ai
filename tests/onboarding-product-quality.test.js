@@ -68,7 +68,11 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /hasSetupToolCall/);
   assert.match(setupService, /hasSupportedSetupArguments/);
   assert.match(setupService, /record\.supported === true/);
-  assert.match(setupService, /\^\(\?:gpt-5\|o\\d\)/);
+  assert.match(setupService, /split\('\/'\)\.at\(-1\)/);
+  assert.match(setupService, /SETUP_TOOL_TOKEN_BUDGET = 2048/);
+  assert.match(setupService, /reasoning_effort: 'low'/);
+  assert.match(setupService, /\{ forceCompletionTokens: true \}/);
+  assert.match(setupService, /max_completion_tokens\|unsupported/);
   assert.match(setupService, /\/api\/chat/);
   assert.match(setupService, /message\?\.tool_calls/);
   assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
@@ -95,6 +99,7 @@ test('new setup starts in review mode with scheduled scans paused', () => {
 
 test('setup is serialized and remains retryable until the owner exists', () => {
   const setupRoutes = read('routes/setup.ts');
+  const setupService = read('services/setupService.ts');
   const documentModel = read('models/document.ts');
   const handler = setupRoutes.slice(
     setupRoutes.indexOf('let setupRequestQueue'),
@@ -107,25 +112,31 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(handler, /setupPendingRequests -= 1/);
   assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
   assert.match(setupRoutes, /async function recoverCompletedSetup\(\)/);
-  assert.match(setupRoutes, /const configured = await recoverCompletedSetup\(\)/);
+  assert.match(setupRoutes, /configured = await recoverCompletedSetup\(\)/);
   assert.ok(
-    setupRoutes.indexOf('const configured = await recoverCompletedSetup()')
+    setupRoutes.indexOf('configured = await recoverCompletedSetup()')
       < setupRoutes.indexOf('if (req.path.startsWith')
   );
   assert.ok(
-    handler.indexOf('documentModel.getUsers') < handler.indexOf('buildConfigForSave')
+    handler.indexOf('documentModel.hasAnyUser') < handler.indexOf('buildConfigForSave')
   );
-  assert.match(handler, /existingOwners\.length > 0/);
+  assert.match(setupRoutes, /return next\(error\)/);
   assert.match(handler, /An owner account already exists/);
   assert.doesNotMatch(documentModel, /DELETE FROM users/);
   assert.match(documentModel, /db\.transaction/);
   assert.match(documentModel, /SELECT COUNT\(\*\) AS count FROM users/);
   assert.match(documentModel, /Refusing to replace an existing owner account/);
+  assert.match(documentModel, /async hasAnyUser\(\)/);
+  assert.match(documentModel, /SELECT 1 AS present FROM users LIMIT 1/);
   assert.ok(
     handler.indexOf('documentModel.addUser') < handler.lastIndexOf("savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' })")
   );
   assert.match(handler, /Initial setup remains open for retry/);
   assert.match(read('services/paperlessService.ts'), /timeout: PAPERLESS_REQUEST_TIMEOUT_MS/);
+  assert.match(setupRoutes, /injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerConfig\.openrouterBaseUrl/);
+  assert.match(setupRoutes, /OPENROUTER_BASE_URL: injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerPayload\.openrouterBaseUrl/);
+  assert.match(setupService, /injectedEnvironmentValue\(name: string\)/);
+  assert.match(setupService, /runtimeConfig\.injectedEnvironment = injectedEnvironment/);
 });
 
 test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {
