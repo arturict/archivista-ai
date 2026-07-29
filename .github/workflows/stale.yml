@@ -2,15 +2,20 @@ name: Mark stale issues and pull requests
 
 on:
   schedule:
-    - cron: "0 0 * * *" # Runs daily at midnight
+    - cron: "31 3 * * 1" # Weekly maintenance matches the 60/30-day windows
+
+concurrency:
+  group: stale-issue-maintenance
+  cancel-in-progress: true
 
 jobs:
   stale:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - name: Close stale issues and pull requests
-      uses: actions/stale@v8
+      uses: actions/stale@v11
       with:
         repo-token: ${{ secrets.stale_bot }}
         stale-issue-message: "This issue has been marked as stale due to inactivity. Please respond to keep it open."

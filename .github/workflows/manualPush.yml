@@ -13,10 +13,39 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: manual-docker-publish-${{ inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DOCKER_BUILD_RECORD_UPLOAD: false
     steps:
+      - name: Validate manual publish target
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$REQUESTED_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo "::error::The requested value is not a valid OCI image tag."
+            exit 1
+          fi
+          if [[ "$REQUESTED_TAG" == "nightly" ]]; then
+            echo "::error::The nightly tag is owned by the scheduled multiarch workflow."
+            exit 1
+          fi
+          if [[ "$REQUESTED_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "::error::Immutable release tags are owned by published GitHub releases."
+            exit 1
+          fi
+          if [[ "$REQUESTED_TAG" == "latest" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::The latest tag may only be rebuilt from main."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -46,15 +75,16 @@ jobs:
             type=sha,prefix={{branch}}-
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=tagvico-docker-main
+            type=gha
 
       - name: Summary
         run: |
