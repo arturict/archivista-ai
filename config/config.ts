@@ -140,11 +140,12 @@ module.exports = {
     baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
   },
   ollama: {
+    apiKey: process.env.OLLAMA_API_KEY || '',
     apiUrl: process.env.OLLAMA_API_URL || 'http://localhost:11434',
     model: process.env.OLLAMA_MODEL || getDefaultModel('ollama')
   },
   ollamaCloud: {
-    apiKey: process.env.OLLAMA_CLOUD_API_KEY || process.env.OLLAMA_API_KEY || '',
+    apiKey: process.env.OLLAMA_CLOUD_API_KEY || '',
     apiUrl: process.env.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
     model: process.env.OLLAMA_CLOUD_MODEL || getDefaultModel('ollama-cloud')
   },

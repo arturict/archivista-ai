@@ -457,7 +457,7 @@ async function patchSettings(input: unknown) {
     && parsed.patch.provider?.instanceId === 'copilot';
   if ((selectionChanged || activeCopilotCredentialsChanged) && ['codex', 'copilot'].includes(activeProviderId)) {
     const definition = providerRegistry.getProviderDefinition(activeProviderId);
-    const candidateEnvironment = { ...effective, ...patch };
+    const candidateEnvironment = effectiveEnvironment({ ...effective, ...patch });
     const selectedModelId = definition
       ? providerRegistry.getConfiguredModel(definition, candidateEnvironment)
       : '';

@@ -1,8 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.OLLAMA_API_KEY = 'local-runtime-key';
+process.env.OLLAMA_CLOUD_API_KEY = '';
+
 const catalog = require('../dist/services/providerCatalogService');
 const helpers = require('../dist/services/configHelpers');
+const runtimeConfig = require('../dist/config/config');
 
 test('subscription and cloud providers normalize to first-class provider IDs', () => {
   assert.equal(catalog.normalizeProvider('opencode'), 'opencode');
@@ -57,6 +61,12 @@ test('provider payload keeps OpenCode, Copilot, and Ollama Cloud credentials sep
     OLLAMA_API_KEY: 'local_ollama_key'
   });
   assert.equal(ollama.ollamaApiKey, 'local_ollama_key');
+  assert.equal(ollama.ollamaCloudApiKey, '');
+});
+
+test('runtime keeps local and cloud Ollama credentials separate', () => {
+  assert.equal(runtimeConfig.ollama.apiKey, 'local-runtime-key');
+  assert.equal(runtimeConfig.ollamaCloud.apiKey, '');
 });
 
 test('provider payload preserves a custom OpenRouter base URL', () => {

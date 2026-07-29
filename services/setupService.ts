@@ -358,7 +358,8 @@ class SetupService {
     } else if (aiProvider === 'ollama') {
       const ollamaValid = await this.validateOllamaConfig(
         config.OLLAMA_API_URL || 'http://localhost:11434',
-        config.OLLAMA_MODEL
+        config.OLLAMA_MODEL,
+        config.OLLAMA_API_KEY
       );
       if (!ollamaValid) {
         throw new Error('Invalid Ollama configuration');
@@ -367,7 +368,7 @@ class SetupService {
       const ollamaCloudValid = await this.validateOllamaConfig(
         config.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
         config.OLLAMA_CLOUD_MODEL,
-        config.OLLAMA_CLOUD_API_KEY || config.OLLAMA_API_KEY
+        config.OLLAMA_CLOUD_API_KEY
       );
       if (!ollamaCloudValid) {
         throw new Error('Invalid Ollama Cloud configuration');

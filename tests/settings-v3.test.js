@@ -10,6 +10,7 @@ process.env.SCAN_INTERVAL = '5 * * * *';
 process.env.AI_PROVIDER = 'ollama';
 process.env.OLLAMA_MODEL = 'qwen3.5:4b';
 process.env.OPENROUTER_API_KEY = '';
+process.env.COPILOT_GITHUB_TOKEN = 'injected-copilot-token';
 fs.writeFileSync(path.join(dataDir, '.env'), [
   'TAGVICO_AI_INITIAL_SETUP=yes',
   'TAGVICO_AI_VERSION=3.0.0',
@@ -225,6 +226,35 @@ test('PATCH revalidates active Copilot models when account credentials change', 
     }), /not available to this runtime account/);
     const after = await setupService.loadConfig();
     assert.equal(after.COPILOT_GITHUB_TOKEN, before.COPILOT_GITHUB_TOKEN);
+  } finally {
+    providerDiscoveryService.discoverProviderModels = discoverProviderModels;
+  }
+});
+
+test('PATCH validates Copilot changes against the externally managed credential', async () => {
+  const discoverProviderModels = providerDiscoveryService.discoverProviderModels;
+  try {
+    providerDiscoveryService.discoverProviderModels = async (providerId, environment) => {
+      assert.equal(providerId, 'copilot');
+      assert.equal(environment.COPILOT_GITHUB_TOKEN, 'injected-copilot-token');
+      return [{ id: 'injected-account-model', name: 'Injected account model' }];
+    };
+    const current = await service.getSettings();
+    await service.patchSettings({
+      revision: current.revision,
+      patch: {
+        provider: {
+          instanceId: 'copilot',
+          values: { githubToken: 'browser-supplied-token' }
+        },
+        ai: {
+          activeProviderInstanceId: 'copilot',
+          activeModelId: 'injected-account-model'
+        }
+      }
+    });
+    const persisted = await setupService.loadConfig();
+    assert.equal(persisted.COPILOT_GITHUB_TOKEN, 'browser-supplied-token');
   } finally {
     providerDiscoveryService.discoverProviderModels = discoverProviderModels;
   }

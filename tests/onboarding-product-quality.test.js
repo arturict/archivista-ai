@@ -141,6 +141,13 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(setupRoutes, /OLLAMA_API_KEY: providerPayload\.provider === 'ollama'/);
   assert.match(setupRoutes, /providerConfig\.ollamaApiKey \|\| currentConfig\.OLLAMA_API_KEY/);
   assert.match(setupRoutes, /'OLLAMA_API_KEY'/);
+  assert.match(setupService, /config\.OLLAMA_MODEL,\s*config\.OLLAMA_API_KEY/);
+  assert.match(setupService, /config\.OLLAMA_CLOUD_MODEL,\s*config\.OLLAMA_CLOUD_API_KEY/);
+  assert.doesNotMatch(setupService, /OLLAMA_CLOUD_API_KEY \|\| config\.OLLAMA_API_KEY/);
+  const runtimeConfig = read('config/config.ts');
+  assert.match(runtimeConfig, /ollama:\s*\{\s*apiKey: process\.env\.OLLAMA_API_KEY \|\| ''/);
+  assert.match(runtimeConfig, /ollamaCloud:\s*\{\s*apiKey: process\.env\.OLLAMA_CLOUD_API_KEY \|\| ''/);
+  assert.doesNotMatch(runtimeConfig, /OLLAMA_CLOUD_API_KEY \|\| process\.env\.OLLAMA_API_KEY/);
 });
 
 test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {
