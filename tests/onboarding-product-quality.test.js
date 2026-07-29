@@ -295,6 +295,8 @@ test('global history rescan remains available when the active filter has no matc
 
 test('landing metrics stay separate, anonymous and privacy-signal aware', () => {
   const landing = read('docs/index.html');
+  assert.equal(landing.match(/ALLOW_REMOTE_SETUP: "yes"/g)?.length, 2);
+  assert.match(landing, /After setup succeeds, remove[\s\S]*ALLOW_REMOTE_SETUP[\s\S]*recreate the container/);
   assert.match(landing, /Requests, not unique people/);
   assert.match(landing, /credentials: "omit"/);
   assert.match(landing, /referrerPolicy: "no-referrer"/);

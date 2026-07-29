@@ -2430,6 +2430,8 @@
     restart: unless-stopped
     ports:
       - "8080:3000"
+    environment:
+      ALLOW_REMOTE_SETUP: "yes"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -2437,7 +2439,9 @@ volumes:
   tagvico_ai_data:</code></pre>
             </div>
             <p class="install-note">
-              Then open <strong>http://localhost:8080/setup</strong>. Back up the data volume before every upgrade.
+              Then open <strong>http://localhost:8080/setup</strong>. After setup succeeds, remove
+              <strong>ALLOW_REMOTE_SETUP</strong> and recreate the container. The named volume keeps your configuration.
+              Back up the data volume before every upgrade.
             </p>
           </div>
         </div>
@@ -2463,6 +2467,8 @@ volumes:
     restart: unless-stopped
     ports:
       - "8080:3000"
+    environment:
+      ALLOW_REMOTE_SETUP: "yes"
     volumes:
       - tagvico_ai_data:/app/data
 
