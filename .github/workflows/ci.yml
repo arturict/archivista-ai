@@ -18,16 +18,83 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+        with:
+          fetch-depth: 2
+
+      # Keep the required `quality` check present on every PR. Workflow-level
+      # path filters can leave required checks pending, so only known
+      # non-product repository metadata takes this lightweight path.
+      - name: Classify changed paths
+        id: changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          run_full=true
+          if [[ -n "$BASE_SHA" ]] &&
+             [[ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BASE_SHA" || true
+            fi
+            if git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              run_full=false
+              changed=false
+              while IFS= read -r -d '' path; do
+                changed=true
+                case "$path" in
+                  .github/FUNDING.yml|.github/ISSUE_TEMPLATE/*|.github/pull_request_template.md|CODE_OF_CONDUCT.md|docs/launch-post.md)
+                    ;;
+                  *)
+                    run_full=true
+                    ;;
+                esac
+              done < <(git diff --name-only -z "$BASE_SHA" "$GITHUB_SHA")
+              [[ "$changed" == "true" ]] || run_full=true
+            fi
+          fi
+          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        if: steps.changes.outputs.run_full == 'true' && github.event_name != 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # PR caches are branch-scoped. A single Tagvico npm cache is currently
+      # about 697 MB, so only the default branch writes this cache.
+      - name: Set up Node with default-branch npm cache
+        if: steps.changes.outputs.run_full == 'true' && github.event_name == 'push'
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
-      - run: npm test
-      - run: npm run docs:build
-      - run: npm audit --omit=dev --audit-level=high
-      - run: node --check dist/server.js
+
+      - name: Install locked dependencies
+        if: steps.changes.outputs.run_full == 'true'
+        run: npm ci --no-audit --fund=false
+
+      - name: Run quality checks and unit tests
+        if: steps.changes.outputs.run_full == 'true'
+        run: npm test
+
+      - name: Build versioned documentation
+        if: steps.changes.outputs.run_full == 'true'
+        run: npm run docs:build
+
+      - name: Audit production dependencies
+        if: steps.changes.outputs.run_full == 'true'
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Check compiled server syntax
+        if: steps.changes.outputs.run_full == 'true'
+        run: node --check dist/server.js
         # Syntax-only smoke test; starting the server would keep CI alive.
+
       - name: Verify package scripts
+        if: steps.changes.outputs.run_full == 'true'
         run: |
           node -e "const p=require('./package.json'); if(!p.scripts.start) throw new Error('missing start script')"
+
+      - name: Record metadata-only validation
+        if: steps.changes.outputs.run_full != 'true'
+        run: echo "Only non-product repository metadata changed; the required quality check remains satisfied."

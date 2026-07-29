@@ -1,16 +1,26 @@
+name: Docker build and publish
+
 on:
   release:
     types: [published]  # Only triggers when a release is published
   schedule:
-    - cron: "0 0 * * *" # Nightly build
+    - cron: "17 2 * * 0" # Weekly multiarch validation and nightly tag refresh
 
 permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: docker-publish-${{ github.event_name == 'release' && github.event.release.tag_name || 'weekly-nightly' }}
+  cancel-in-progress: ${{ github.event_name == 'schedule' }}
+
 jobs:
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # Build records duplicate data already available in the log and summary.
+      DOCKER_BUILD_RECORD_UPLOAD: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,13 +54,29 @@ jobs:
             # to an alpha, beta, or release candidate.
             type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
+      - name: Build and push release
+        if: github.event_name == 'release'
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=tagvico-docker-main
+            type=gha
+
+      - name: Build and push weekly nightly
+        if: github.event_name == 'schedule'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=tagvico-docker-main
+            type=gha
+          cache-to: type=gha,scope=tagvico-docker-main,mode=max,ignore-error=true
