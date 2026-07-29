@@ -16,7 +16,7 @@ function errorMessage(error: unknown): string {
 }
 
 function tokenLimitParam(model: string, value: number) {
-  return /^gpt-5/i.test(model || '')
+  return /^(?:gpt-5|o\d)/i.test(model || '')
     ? { max_completion_tokens: value }
     : { max_tokens: value };
 }

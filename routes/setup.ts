@@ -240,13 +240,24 @@ let PUBLIC_ROUTES = [
 ];
 declare let runningTask: boolean;
 
+async function recoverCompletedSetup(): Promise<boolean> {
+  const configured = await setupService.isConfigured();
+  if (configured) return true;
+  const existingOwners = await documentModel.getUsers();
+  if (!existingOwners.length) return false;
+  // Owner creation is the final durable setup step. If the process exited
+  // before the marker write, close setup before routing the returning owner.
+  await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
+  return setupService.isConfigured();
+}
+
 // Combined middleware to check authentication and setup
 router.use(async (req: Req, res: Res, next: Next) => {
   const token = req.cookies.jwt || firstString(req.headers.authorization)?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
+  const configured = await recoverCompletedSetup();
 
   if (req.path.startsWith('/setup')) {
-    const configured = await setupService.isConfigured().catch(() => false);
     const local = isLocalProxyRequest({ remoteAddress: req.socket?.remoteAddress, forwardedFor: firstString(req.headers['x-forwarded-for']) });
     if (!configured && !local && process.env.ALLOW_REMOTE_SETUP !== 'yes') {
       return res.status(403).send('Remote setup is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.');
@@ -278,17 +289,15 @@ router.use(async (req: Req, res: Res, next: Next) => {
 
   // Setup check
   try {
-    const isConfigured = await setupService.isConfigured();
-
     // API and health endpoints must never be redirected to an HTML page; they
     // return JSON and handle their own auth/setup gating (e.g. allowDuringSetup).
     const isApiRequest = req.path.startsWith('/api/') || req.path === '/health';
 
     if (!isApiRequest) {
       const initialSetup = resolveEnv('TAGVICO_AI_INITIAL_SETUP', 'ARCHIVISTA_AI_INITIAL_SETUP');
-      if (!isConfigured && (!initialSetup || initialSetup === 'no') && !req.path.startsWith('/setup')) {
+      if (!configured && (!initialSetup || initialSetup === 'no') && !req.path.startsWith('/setup')) {
         return res.redirect('/setup');
-      } else if (!isConfigured && initialSetup === 'yes' && !req.path.startsWith('/settings')) {
+      } else if (!configured && initialSetup === 'yes' && !req.path.startsWith('/settings')) {
         return res.redirect('/settings');
       }
     }

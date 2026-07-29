@@ -68,6 +68,7 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /hasSetupToolCall/);
   assert.match(setupService, /hasSupportedSetupArguments/);
   assert.match(setupService, /record\.supported === true/);
+  assert.match(setupService, /\^\(\?:gpt-5\|o\\d\)/);
   assert.match(setupService, /\/api\/chat/);
   assert.match(setupService, /message\?\.tool_calls/);
   assert.match(setupService, /SETUP_VALIDATION_TIMEOUT_MS = 15_000/);
@@ -76,6 +77,9 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupRoutes, /withSetupProviderTimeout(?:<SetupProviderStatus>)?\(\s*copilotService\.healthcheck/);
   assert.match(acceptance, /selectedProviderProbe\.body\.validatedModelId/);
   assert.match(acceptance, /cataloglessProviderProbe\.body\.validatedModelId/);
+  assert.match(acceptance, /Array\.isArray\(tasks\.body\?\.results\)/);
+  assert.match(acceptance, /Number\(task\?\.related_document\)/);
+  assert.match(acceptance, /task\.related_document\.id/);
   assert.match(fixture, /\/catalogless\/chat\/completions/);
   assert.match(fixture, /\/__release\/config/);
   assert.match(fixture, /text-embedding-release/);
@@ -102,6 +106,12 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(handler, /finally\s*\{\s*releaseSetupRequestLock\?\.\(\)/);
   assert.match(handler, /setupPendingRequests -= 1/);
   assert.match(handler, /config\.TAGVICO_AI_INITIAL_SETUP = 'no'/);
+  assert.match(setupRoutes, /async function recoverCompletedSetup\(\)/);
+  assert.match(setupRoutes, /const configured = await recoverCompletedSetup\(\)/);
+  assert.ok(
+    setupRoutes.indexOf('const configured = await recoverCompletedSetup()')
+      < setupRoutes.indexOf('if (req.path.startsWith')
+  );
   assert.ok(
     handler.indexOf('documentModel.getUsers') < handler.indexOf('buildConfigForSave')
   );

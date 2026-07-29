@@ -11,6 +11,16 @@ const headers = { origin, 'content-type': 'application/json' };
 const responseJson = async (response) => ({ response, body: await response.json().catch(() => ({})) });
 const request = (path, options = {}) => fetch(`${baseUrl}${path}`, options);
 
+function relatedDocumentId(task) {
+  const directId = Number(task?.related_document);
+  if (Number.isSafeInteger(directId) && directId > 0) return directId;
+  if (task?.related_document && typeof task.related_document === 'object') {
+    const id = Number(task.related_document.id);
+    if (Number.isSafeInteger(id) && id > 0) return id;
+  }
+  return null;
+}
+
 const health = await responseJson(await request('/health'));
 assert.equal(health.response.status, 200);
 
@@ -51,12 +61,18 @@ async function uploadPaperlessDocument({ title, content, filename }) {
       { headers: paperlessHeaders }
     ));
     assert.equal(tasks.response.status, 200, JSON.stringify(tasks.body));
-    const task = Array.isArray(tasks.body) ? tasks.body[0] : null;
-    if (task?.status === 'FAILURE') {
+    const task = Array.isArray(tasks.body?.results)
+      ? tasks.body.results[0]
+      : Array.isArray(tasks.body)
+        ? tasks.body[0]
+        : tasks.body;
+    const state = String(task?.status || task?.state || '').toUpperCase();
+    const documentId = relatedDocumentId(task);
+    if (['FAILURE', 'FAILED', 'REVOKED'].includes(state)) {
       throw new Error(`Paperless failed to ingest ${filename}: ${task.result || 'unknown error'}`);
     }
-    if (task?.status === 'SUCCESS' && Number(task.related_document) > 0) {
-      return Number(task.related_document);
+    if (documentId && ['SUCCESS', 'SUCCESSFUL', 'COMPLETED'].includes(state)) {
+      return documentId;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
