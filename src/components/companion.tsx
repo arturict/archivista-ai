@@ -134,15 +134,19 @@ const suggestions = [
   }
 ];
 
-function relativeDate(value: string) {
-  const timestamp = new Date(value).getTime();
+function relativeDate(value: string, renderedAt: number) {
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value;
+  const timestamp = new Date(normalized).getTime();
   if (!Number.isFinite(timestamp)) return '';
-  const minutes = Math.round((timestamp - Date.now()) / 60_000);
-  if (Math.abs(minutes) < 60) return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(minutes, 'minute');
+  const minutes = Math.round((timestamp - renderedAt) / 60_000);
+  const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  if (Math.abs(minutes) < 60) return formatter.format(minutes, 'minute');
   const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(hours, 'hour');
+  if (Math.abs(hours) < 24) return formatter.format(hours, 'hour');
   const days = Math.round(hours / 24);
-  return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(days, 'day');
+  return formatter.format(days, 'day');
 }
 
 function ToolActivityCard({ activity }: { activity: CompanionToolActivityModel }) {
@@ -181,8 +185,8 @@ function ToolActivityCard({ activity }: { activity: CompanionToolActivityModel }
       {activity.result?.count !== undefined ? <p><span>Result</span>{activity.result.count} item{activity.result.count === 1 ? '' : 's'}</p> : null}
       {documents.length ? <ul>
         {documents.map((document) => <li key={document.id}>
-          <span className="companion-document-id">#{document.id}</span>
-          <strong>{document.title}</strong>
+          <a className="companion-document-id" href={`/documents/${document.id}`} target="_blank" rel="noreferrer" aria-label={`Open source document ${document.id}`}>#{document.id}</a>
+          <strong><a href={`/documents/${document.id}`} target="_blank" rel="noreferrer">{document.title}</a></strong>
           {document.created ? <small>{document.created}</small> : null}
         </li>)}
       </ul> : null}
@@ -232,13 +236,17 @@ export function Companion({
   initialMessages,
   initialApprovals,
   initialSessions,
-  canApprove
+  canApprove,
+  renderedAt,
+  showFirstRun = false
 }: {
   sessionId: string;
   initialMessages: UIMessage[];
   initialApprovals: Approval[];
   initialSessions: SessionSummary[];
   canApprove: boolean;
+  renderedAt: number;
+  showFirstRun?: boolean;
 }) {
   const router = useRouter();
   const [approvals, setApprovals] = useState(initialApprovals);
@@ -254,6 +262,7 @@ export function Companion({
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState('');
+  const [referenceTime, setReferenceTime] = useState(renderedAt);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -285,6 +294,11 @@ export function Companion({
   );
 
   useEffect(() => setSessions(initialSessions), [initialSessions]);
+  useEffect(() => {
+    setReferenceTime(Date.now());
+    const timer = window.setInterval(() => setReferenceTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: isWorking ? 'smooth' : 'instant', block: 'end' });
   }, [isWorking, messages]);
@@ -457,7 +471,7 @@ export function Companion({
           </form> : <>
             <button type="button" className="companion-session-open" onClick={() => router.push(`/companion?chat=${encodeURIComponent(session.id)}`)}>
               <strong>{session.title || 'New conversation'}</strong>
-              <small>{session.preview || `${Number(session.message_count) || 0} messages`} · {relativeDate(session.updated_at)}</small>
+              <small>{session.preview || `${Number(session.message_count) || 0} messages`} · {relativeDate(session.updated_at, referenceTime)}</small>
             </button>
             <div className="companion-session-actions">
               <button type="button" onClick={() => { setEditingSession(session.id); setTitleDraft(session.title || 'New conversation'); }} aria-label={`Rename ${session.title || 'conversation'}`}><Pencil /></button>
@@ -502,11 +516,18 @@ export function Companion({
       </header>
 
       <div className="companion-messages" aria-live="polite">
-        {!messages.length ? <div className="companion-empty">
+        {!messages.length ? <div className={`companion-empty${showFirstRun ? ' is-first-run' : ''}`}>
           <span className="companion-empty-mark"><FileSearch aria-hidden="true" /></span>
-          <p className="eyebrow">Grounded in your documents</p>
-          <h2>What do you want to know?</h2>
-          <p>Ask naturally. Tagvico will show every Paperless search and document read it uses, then cite the matching document IDs.</p>
+          <p className="eyebrow">{showFirstRun ? 'Your first five minutes' : 'Grounded in your documents'}</p>
+          <h2>{showFirstRun ? 'Start with one real question.' : 'What do you want to know?'}</h2>
+          <p>{showFirstRun
+            ? 'Your connections are ready. Ask a read-only question, open the cited Paperless source, then request an action. Tagvico will wait for approval before changing anything.'
+            : 'Ask naturally. Tagvico will show every Paperless search and document read it uses, then cite the matching document IDs.'}</p>
+          {showFirstRun ? <ol className="companion-first-run-steps">
+            <li><span>1</span><strong>Ask</strong><small>Start with “Find my most recent documents.”</small></li>
+            <li><span>2</span><strong>Verify</strong><small>Open a cited source from the research trail.</small></li>
+            <li><span>3</span><strong>Act safely</strong><small>Request an action, review it, then approve or reject.</small></li>
+          </ol> : null}
           <div className="companion-suggestions">
             {suggestions.map(({ icon: Icon, title, prompt }) => <button type="button" key={title} onClick={() => submitText(prompt)}>
               <Icon aria-hidden="true" />

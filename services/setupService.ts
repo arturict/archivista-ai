@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs';
+import { promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
 import axios from 'axios';
 import { AzureOpenAI, OpenAI } from 'openai';
@@ -8,20 +8,103 @@ const runtimeConfig = require('../config/config');
 const { normalizeProvider } = require('./providerCatalogService');
 
 type SetupConfig = Record<string, string>;
+const SETUP_VALIDATION_TIMEOUT_MS = 15_000;
+const SETUP_TOOL_NAME = 'confirm_tagvico_tool_support';
+const SETUP_TOOL_REASONING_TOKEN_BUDGET = 2048;
+const SETUP_TOOL_STANDARD_TOKEN_BUDGET = 64;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function tokenLimitParam(model: string, value: number) {
-  return /^gpt-5/i.test(model || '')
-    ? { max_completion_tokens: value }
-    : { max_tokens: value };
+function isReasoningModel(model: string) {
+  const unqualifiedModel = String(model || '').split('/').at(-1) || '';
+  return /^(?:gpt-5|o\d)/i.test(unqualifiedModel);
+}
+
+function tokenLimitParam(
+  model: string,
+  forceCompletionTokens = false,
+  forceStandardTokens = false
+) {
+  if (forceStandardTokens) {
+    return { max_tokens: SETUP_TOOL_STANDARD_TOKEN_BUDGET };
+  }
+  return forceCompletionTokens || isReasoningModel(model)
+    ? { max_completion_tokens: SETUP_TOOL_REASONING_TOKEN_BUDGET }
+    : { max_tokens: SETUP_TOOL_STANDARD_TOKEN_BUDGET };
+}
+
+function toolValidationRequest(
+  model: string,
+  options: {
+    forceCompletionTokens?: boolean;
+    forceStandardTokens?: boolean;
+    reasoningEffort?: boolean;
+  } = {}
+) {
+  const reasoningModel = isReasoningModel(model);
+  return {
+    model,
+    messages: [{
+      role: 'user' as const,
+      content: 'Call confirm_tagvico_tool_support with supported set to true.'
+    }],
+    tools: [{
+      type: 'function' as const,
+      function: {
+        name: SETUP_TOOL_NAME,
+        description: 'Confirms that the selected model can call tools required by Tagvico.',
+        parameters: {
+          type: 'object',
+          properties: { supported: { type: 'boolean' } },
+          required: ['supported'],
+          additionalProperties: false
+        }
+      }
+    }],
+    tool_choice: {
+      type: 'function' as const,
+      function: { name: SETUP_TOOL_NAME }
+    },
+    ...tokenLimitParam(model, options.forceCompletionTokens, options.forceStandardTokens),
+    ...(reasoningModel && options.reasoningEffort ? { reasoning_effort: 'low' as const } : {})
+  };
+}
+
+function hasSetupToolCall(response: unknown): boolean {
+  const choices = (response as {
+    choices?: Array<{
+      message?: {
+        tool_calls?: Array<{ function?: { name?: string; arguments?: unknown } }>;
+      };
+    }>;
+  } | null)?.choices;
+  return Boolean(choices?.some((choice) => choice.message?.tool_calls?.some(
+    (tool) => tool.function?.name === SETUP_TOOL_NAME
+      && hasSupportedSetupArguments(tool.function.arguments)
+  )));
+}
+
+function hasSupportedSetupArguments(value: unknown): boolean {
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return false;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+  const record = parsed as Record<string, unknown>;
+  return record.supported === true
+    && Object.keys(record).length === 1;
 }
 
 class SetupService {
   private readonly envPath: string;
   private readonly injectedEnvironmentKeys: Set<string>;
+  private persistedEnvironmentKeys: Set<string>;
   private configured: boolean | null;
   private writeQueue: Promise<void> = Promise.resolve();
 
@@ -32,7 +115,16 @@ class SetupService {
         ? [...runtimeConfig.injectedEnvironment]
         : []
     );
+    this.persistedEnvironmentKeys = new Set(Object.keys(this.readPersistedEnvironment() || {}));
     this.configured = null; // Variable to store the configuration status
+  }
+
+  private readPersistedEnvironment(): SetupConfig | null {
+    try {
+      return dotenv.parse(readFileSync(this.envPath, 'utf8'));
+    } catch {
+      return null;
+    }
   }
 
   async loadConfig(): Promise<SetupConfig | null> {
@@ -50,6 +142,7 @@ class SetupService {
       const baseUrl = String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
       console.log('Validating Paperless config for:', baseUrl + '/api/documents/');
       const response = await axios.get(`${baseUrl}/api/documents/`, {
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -63,42 +156,52 @@ class SetupService {
 
   async validateApiPermissions(url: string, token: string) {
     const baseUrl = String(url || '').replace(/\/+$/, '').replace(/\/api$/i, '');
-    for (const endpoint of ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users']) {
-      try {
-        console.log(`Validating API permissions for ${baseUrl}/api/${endpoint}/`);
-        const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
-          headers: {
-            'Authorization': `Token ${token}`
+    const checks = await Promise.all(
+      ['correspondents', 'tags', 'documents', 'document_types', 'custom_fields', 'users'].map(async (endpoint) => {
+        try {
+          console.log(`Validating API permissions for ${baseUrl}/api/${endpoint}/`);
+          const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
+            timeout: SETUP_VALIDATION_TIMEOUT_MS,
+            headers: {
+              'Authorization': `Token ${token}`
+            }
+          });
+          console.log(`API permissions validated for ${endpoint}, ${response.status}`);
+          if (response.status !== 200) {
+            console.error(`API permissions validation failed for ${endpoint}`);
+            return endpoint;
           }
-        });
-        console.log(`API permissions validated for ${endpoint}, ${response.status}`);
-        if (response.status !== 200) {
-          console.error(`API permissions validation failed for ${endpoint}`);
-          return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
+        } catch (error) {
+          console.error(`API permissions validation failed for ${endpoint}:`, errorMessage(error));
+          return endpoint;
         }
-      } catch (error) {
-        console.error(`API permissions validation failed for ${endpoint}:`, errorMessage(error));
-        return { success: false, message: `API permissions validation failed for endpoint '/api/${endpoint}/'` };
-      }
+        return null;
+      })
+    );
+    const failedEndpoint = checks.find(Boolean);
+    if (failedEndpoint) {
+      return {
+        success: false,
+        message: `API permissions validation failed for endpoint '/api/${failedEndpoint}/'`
+      };
     }
     return { success: true, message: 'API permissions validated successfully' };
-}
+  }
 
 
-  async validateOpenAIConfig(apiKey?: string): Promise<boolean> {
+  async validateOpenAIConfig(apiKey?: string, selectedModel?: string): Promise<boolean> {
     if (apiKey) {
       try {
-        const openai = new OpenAI({ apiKey });
-        const model = process.env.OPENAI_MODEL || 'gpt-5.4-nano';
-        const response = await openai.chat.completions.create({
+        const openai = new OpenAI({ apiKey, timeout: SETUP_VALIDATION_TIMEOUT_MS });
+        const model = selectedModel || process.env.OPENAI_MODEL || 'gpt-5.4-nano';
+        const response = await openai.chat.completions.create(toolValidationRequest(
           model,
-          messages: [{ role: "user", content: "Reply with the single word: ok" }],
-          ...tokenLimitParam(model, 8)
-        });
+          { reasoningEffort: true }
+        ));
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-        return response.choices && response.choices.length > 0;
+        return hasSetupToolCall(response);
       } catch (error) {
         console.error('OpenAI validation error:', errorMessage(error));
         return false;
@@ -107,7 +210,11 @@ class SetupService {
     return false;
   }
 
-  async validateOpenRouterConfig(apiKey?: string, model = 'openai/gpt-5.4-nano'): Promise<boolean> {
+  async validateOpenRouterConfig(
+    apiKey?: string,
+    model = 'openai/gpt-5.4-nano',
+    baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
+  ): Promise<boolean> {
     if (!apiKey) {
       return false;
     }
@@ -115,20 +222,20 @@ class SetupService {
     try {
       const openai = new OpenAI({
         apiKey,
-        baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+        baseURL: baseUrl,
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         defaultHeaders: {
           'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER || 'https://github.com/arturict/tagvico-ai',
           'X-Title': 'Tagvico AI'
         }
       });
 
-      const response = await openai.chat.completions.create({
+      const response = await openai.chat.completions.create(toolValidationRequest(
         model,
-        messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-        ...tokenLimitParam(model, 8)
-      });
+        { reasoningEffort: true }
+      ));
 
-      return !!response?.choices?.length;
+      return hasSetupToolCall(response);
     } catch (error) {
       console.error('OpenRouter validation error:', errorMessage(error));
       return false;
@@ -150,12 +257,10 @@ class SetupService {
       const openai = new OpenAI({ 
         apiKey: config.apiKey, 
         baseURL: config.baseURL,
+        timeout: SETUP_VALIDATION_TIMEOUT_MS
       });
-      const completion = await openai.chat.completions.create({
-        messages: [{ role: "user", content: "Test" }],
-        model: config.model,
-      });
-      return completion.choices && completion.choices.length > 0;
+      const completion = await openai.chat.completions.create(toolValidationRequest(config.model));
+      return hasSetupToolCall(completion);
     } catch (error) {
       console.error('Custom AI validation error:', errorMessage(error));
       return false;
@@ -178,14 +283,36 @@ class SetupService {
 
   async validateOllamaConfig(url: string, model?: string, apiKey = '') {
     try {
-      const response = await axios.post(`${url}/api/generate`, {
+      const response = await axios.post(`${url.replace(/\/$/, '')}/api/chat`, {
         model: model || 'llama3.2',
-        prompt: 'Test',
-        stream: false
+        messages: [{
+          role: 'user',
+          content: `Call ${SETUP_TOOL_NAME} with supported set to true.`
+        }],
+        tools: [{
+          type: 'function',
+          function: {
+            name: SETUP_TOOL_NAME,
+            description: 'Confirms that the selected model can call tools required by Tagvico.',
+            parameters: {
+              type: 'object',
+              properties: { supported: { type: 'boolean' } },
+              required: ['supported'],
+              additionalProperties: false
+            }
+          }
+        }],
+        stream: false,
+        options: { num_predict: 32 }
       }, {
+        timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined
       });
-      return response.data && response.data.response;
+      return Boolean(response.data?.message?.tool_calls?.some(
+        (tool: { function?: { name?: string; arguments?: unknown } }) =>
+          tool.function?.name === SETUP_TOOL_NAME
+          && hasSupportedSetupArguments(tool.function.arguments)
+      ));
     } catch (error) {
       console.error('Ollama validation error:', errorMessage(error));
       return false;
@@ -200,16 +327,30 @@ class SetupService {
           apiKey,
           endpoint,
           deployment: deploymentName,
-          apiVersion
+          apiVersion,
+          timeout: SETUP_VALIDATION_TIMEOUT_MS
         });
-        const response = await openai.chat.completions.create({
-          model: deploymentName,
-          messages: [{ role: "user", content: "Test" }],
-        });
+        // Azure deployment names are operator-defined and need not reveal the
+        // underlying reasoning-model family.
+        let response;
+        try {
+          response = await openai.chat.completions.create(toolValidationRequest(
+            deploymentName,
+            { forceCompletionTokens: true }
+          ));
+        } catch (error) {
+          if (!/max_completion_tokens|unsupported (?:parameter|argument)|unknown (?:parameter|argument)/i.test(errorMessage(error))) {
+            throw error;
+          }
+          response = await openai.chat.completions.create(toolValidationRequest(
+            deploymentName,
+            { forceStandardTokens: true }
+          ));
+        }
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
         console.log(`[DEBUG] [${timestamp}] OpenAI request sent`);
-        return response.choices && response.choices.length > 0;
+        return hasSetupToolCall(response);
       } catch (error) {
         console.error('OpenAI validation error:', errorMessage(error));
         return false;
@@ -219,6 +360,7 @@ class SetupService {
   }
 
   async validateConfig(config: SetupConfig): Promise<boolean> {
+    config = this.effectiveConfig(config);
     // Validate Paperless config
     const paperlessApiUrl = config.PAPERLESS_API_URL.replace(/\/api/g, '');
     const paperlessValid = await this.validatePaperlessConfig(
@@ -238,20 +380,22 @@ class SetupService {
     if (aiProvider === 'openrouter') {
       const openRouterValid = await this.validateOpenRouterConfig(
         config.OPENROUTER_API_KEY || config.OPENAI_API_KEY,
-        config.OPENROUTER_MODEL || config.AI_MODEL || 'openai/gpt-5.4-mini'
+        config.OPENROUTER_MODEL || config.AI_MODEL || 'openai/gpt-5.4-mini',
+        config.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
       );
       if (!openRouterValid) {
         throw new Error('Invalid OpenRouter configuration');
       }
     } else if (aiProvider === 'openai') {
-      const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY);
+      const openaiValid = await this.validateOpenAIConfig(config.OPENAI_API_KEY, config.OPENAI_MODEL);
       if (!openaiValid) {
         throw new Error('Invalid OpenAI configuration');
       }
     } else if (aiProvider === 'ollama') {
       const ollamaValid = await this.validateOllamaConfig(
         config.OLLAMA_API_URL || 'http://localhost:11434',
-        config.OLLAMA_MODEL
+        config.OLLAMA_MODEL,
+        config.OLLAMA_API_KEY
       );
       if (!ollamaValid) {
         throw new Error('Invalid Ollama configuration');
@@ -260,7 +404,7 @@ class SetupService {
       const ollamaCloudValid = await this.validateOllamaConfig(
         config.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
         config.OLLAMA_CLOUD_MODEL,
-        config.OLLAMA_CLOUD_API_KEY || config.OLLAMA_API_KEY
+        config.OLLAMA_CLOUD_API_KEY
       );
       if (!ollamaCloudValid) {
         throw new Error('Invalid Ollama Cloud configuration');
@@ -303,23 +447,15 @@ class SetupService {
     try {
       // Validate the new configuration before saving
       await this.validateConfig(config);
-
-      const JSON_STANDARD_PROMPT = `
-        Return the result EXCLUSIVELY as a JSON object. The Tags and Title MUST be in the language that is used in the document.:
-        
-        {
-          "title": "xxxxx",
-          "correspondent": "xxxxxxxx",
-          "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
-          "document_date": "YYYY-MM-DD",
-          "language": "en/de/es/..."
-        }`;
-
       await this.persistConfig(config);
     } catch (error) {
       console.error('Error saving config:', errorMessage(error));
       throw error;
     }
+  }
+
+  async saveValidatedConfig(config: SetupConfig): Promise<void> {
+    await this.persistConfig(config);
   }
 
   async saveTagPolicy(policy: SetupConfig) {
@@ -329,9 +465,15 @@ class SetupService {
     return next;
   }
 
-  async savePartialConfig(patch: SetupConfig) {
+  async savePartialConfig(
+    patch: SetupConfig,
+    options: {
+      validateCurrent?: (current: SetupConfig) => void | Promise<void>;
+    } = {}
+  ) {
     const operation = this.writeQueue.then(async () => {
       const current = (await this.loadConfig()) || {};
+      await options.validateCurrent?.(current);
       await this.persistConfig({ ...current, ...patch });
     });
     this.writeQueue = operation.catch(() => {});
@@ -370,22 +512,45 @@ class SetupService {
     } finally {
       await fs.rm(temporaryPath, { force: true }).catch(() => {});
     }
-    Object.entries(config).forEach(([key, value]) => {
-      if (!this.injectedEnvironmentKeys.has(key)) process.env[key] = String(value);
-    });
     this.reloadRuntimeConfig();
     const setupMarker = config?.TAGVICO_AI_INITIAL_SETUP || config?.ARCHIVISTA_AI_INITIAL_SETUP;
     this.configured = Boolean(config.PAPERLESS_API_URL && setupMarker === 'yes');
   }
 
   reloadRuntimeConfig() {
+    const persistedEnvironment = this.readPersistedEnvironment();
+    if (persistedEnvironment) {
+      for (const key of this.persistedEnvironmentKeys) {
+        if (!this.injectedEnvironmentKeys.has(key)) delete process.env[key];
+      }
+      for (const [key, value] of Object.entries(persistedEnvironment)) {
+        if (!this.injectedEnvironmentKeys.has(key)) process.env[key] = value;
+      }
+      this.persistedEnvironmentKeys = new Set(Object.keys(persistedEnvironment));
+    }
+    const injectedEnvironment = runtimeConfig.injectedEnvironment;
     const configPath = require.resolve('../config/config');
     delete require.cache[configPath];
     const freshConfig = require('../config/config');
     Object.keys(runtimeConfig).forEach((key) => delete runtimeConfig[key]);
     Object.assign(runtimeConfig, freshConfig);
+    runtimeConfig.injectedEnvironment = injectedEnvironment;
     const cachedModule = require.cache[configPath];
     if (cachedModule) cachedModule.exports = runtimeConfig;
+  }
+
+  injectedEnvironmentValue(name: string): string | undefined {
+    const value = String(process.env[name] || '').trim();
+    return this.injectedEnvironmentKeys.has(name) && value ? value : undefined;
+  }
+
+  effectiveConfig(config: SetupConfig): SetupConfig {
+    const effective = { ...config };
+    for (const key of this.injectedEnvironmentKeys) {
+      const value = this.injectedEnvironmentValue(key);
+      if (value !== undefined) effective[key] = value;
+    }
+    return effective;
   }
 
   async isConfigured() {

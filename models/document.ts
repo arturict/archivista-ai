@@ -1283,16 +1283,17 @@ const documentModel = {
 
   async addUser(username: string, password: string) {
     try {
-      // Lösche alle vorhandenen Benutzer
-      const deleteResult = db.prepare('DELETE FROM users').run();
-      console.log(`[DEBUG] ${deleteResult.changes} existing users deleted`);
-  
-      // Füge den neuen Benutzer hinzu
-      const result = insertUser.run(username, password);
-      if (result.changes > 0) {
+      const createInitialUser = db.transaction(() => {
+        const existing = db.prepare('SELECT COUNT(*) AS count FROM users').get() as { count: number };
+        if (existing.count > 0) return false;
+        return insertUser.run(username, password).changes > 0;
+      });
+      const created = createInitialUser();
+      if (created) {
         console.log(`[DEBUG] User ${username} added`);
         return true;
       }
+      console.warn('[WARN] Refusing to replace an existing owner account');
       return false;
     } catch (error) {
       console.error('[ERROR] adding user:', error);
@@ -1316,6 +1317,11 @@ const documentModel = {
       console.error('[ERROR] getting users:', error);
       return [];
     }
+  },
+
+  async hasAnyUser() {
+    const existing = db.prepare('SELECT 1 AS present FROM users LIMIT 1').get();
+    return Boolean(existing);
   },
 
   async getProcessingTimeStats() {

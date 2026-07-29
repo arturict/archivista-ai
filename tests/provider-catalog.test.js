@@ -1,8 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.OLLAMA_API_KEY = 'local-runtime-key';
+process.env.OLLAMA_CLOUD_API_KEY = '';
+
 const catalog = require('../dist/services/providerCatalogService');
 const helpers = require('../dist/services/configHelpers');
+const runtimeConfig = require('../dist/config/config');
 
 test('subscription and cloud providers normalize to first-class provider IDs', () => {
   assert.equal(catalog.normalizeProvider('opencode'), 'opencode');
@@ -35,7 +39,9 @@ test('provider payload keeps OpenCode, Copilot, and Ollama Cloud credentials sep
     provider: 'opencode',
     selectedModel: 'opencode/model',
     openrouterApiKey: '',
+    openrouterBaseUrl: '',
     ollamaUrl: 'http://localhost:11434',
+    ollamaApiKey: '',
     ollamaCloudUrl: 'https://ollama.com',
     ollamaCloudApiKey: '',
     opencodeBaseUrl: 'https://console.example/v1',
@@ -50,4 +56,44 @@ test('provider payload keeps OpenCode, Copilot, and Ollama Cloud credentials sep
     azureDeploymentName: '',
     azureApiVersion: ''
   });
+  const ollama = helpers.normalizeProviderPayload({
+    aiProvider: 'ollama',
+    OLLAMA_API_KEY: 'local_ollama_key'
+  });
+  assert.equal(ollama.ollamaApiKey, 'local_ollama_key');
+  assert.equal(ollama.ollamaCloudApiKey, '');
+});
+
+test('runtime keeps local and cloud Ollama credentials separate', () => {
+  assert.equal(runtimeConfig.ollama.apiKey, 'local-runtime-key');
+  assert.equal(runtimeConfig.ollamaCloud.apiKey, '');
+});
+
+test('provider payload preserves a custom OpenRouter base URL', () => {
+  const openrouter = helpers.normalizeProviderPayload({
+    aiProvider: 'openrouter',
+    openrouterApiKey: 'or_test',
+    openrouterBaseUrl: 'https://router.example/v1',
+    openrouterModel: 'chat/model'
+  });
+  assert.equal(openrouter.openrouterBaseUrl, 'https://router.example/v1');
+});
+
+test('v3 setup preserves canonical provider model environment keys', () => {
+  for (const [provider, key, model] of [
+    ['ollama-cloud', 'OLLAMA_CLOUD_MODEL', 'cloud/account-model'],
+    ['opencode', 'OPENCODE_MODEL', 'gateway/account-model'],
+    ['copilot', 'COPILOT_MODEL', 'copilot-account-model'],
+    ['codex', 'CODEX_MODEL', 'chatgpt-account-model']
+  ]) {
+    assert.equal(helpers.normalizeProviderPayload({
+      AI_PROVIDER: provider,
+      AI_MODEL: model,
+      [key]: model
+    }).selectedModel, model);
+    assert.equal(helpers.normalizeProviderPayload({
+      AI_PROVIDER: provider,
+      [key]: model
+    }).selectedModel, model);
+  }
 });

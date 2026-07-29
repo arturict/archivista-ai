@@ -1,6 +1,6 @@
 # Tagvico AI privacy notice
 
-Last updated: 17 July 2026
+Last updated: 28 July 2026
 
 Tagvico AI is self-hosted software. The operator of each installation controls
 the Paperless-ngx connection, model provider, network exposure, users, logs,
@@ -70,11 +70,32 @@ send. Disabling analytics stops future heartbeats immediately.
 
 ## Website and GitHub
 
-The documentation website does not require Tagvico application telemetry.
-GitHub independently processes repository visits, stars, clones, issues, and
-release access under GitHub's own terms. The in-app update check and star count
-request public release/repository data directly from GitHub; Tagvico does not
-receive those requests.
+The public Tagvico landing page may send one first-party page-view request to
+the open-source aggregate receiver. The request contains no body and uses no
+cookie, local storage, visitor or session identifier, fingerprint, referrer,
+precise location, advertising identifier, or cross-site profile. The receiver
+increments one UTC-day counter and retains daily totals for 93 days. A page
+view is a request, not a unique person.
+
+The browser skips the page-view request when Global Privacy Control or Do Not
+Track is enabled. Network infrastructure necessarily processes an IP address
+to deliver a request, but the Tagvico receiver does not read or store source IP
+addresses or user-agent headers. Infrastructure request logging must be
+disabled or minimized before this endpoint is enabled.
+
+The landing page may show two deliberately separate statistics: page views
+over the previous 30 days, and unauthenticated reports from opted-in active
+installations for the current month. Both public write paths fail closed
+without their shared-key rate limiter, and installation totals below five are
+not published exactly. GitHub independently processes repository visits,
+stars, clones, issues, and release access under GitHub's own terms. Those
+GitHub statistics are not treated as Tagvico installations or users.
+
+The in-app update check and star count request public release and repository
+data directly from GitHub; Tagvico does not receive those requests. See the
+repository's [`telemetry/PRIVACY_ASSESSMENT.md`](telemetry/PRIVACY_ASSESSMENT.md)
+for the narrow consent and notice assessment that applies to the unmodified
+first-party counter.
 
 ## Contact and changes
 

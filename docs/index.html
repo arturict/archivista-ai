@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tagvico — Turn your Paperless archive into useful work</title>
+    <title>Tagvico: Turn your Paperless archive into useful work</title>
     <meta
       name="description"
       content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
@@ -15,13 +15,14 @@
       content="Paperless-ngx, self-hosted document management, document automation, Ollama, automatic tagging, document chat"
     >
     <meta name="theme-color" content="#f5f2e8">
+    <meta name="tagvico-metrics-endpoint" content="https://telemetry.tagvico.arturf.ch">
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
     <link rel="canonical" href="https://tagvico.arturf.ch/">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/tagvico-icon.png">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Tagvico">
-    <meta property="og:title" content="Tagvico — Turn your Paperless archive into useful work">
+    <meta property="og:title" content="Tagvico: Turn your Paperless archive into useful work">
     <meta
       property="og:description"
       content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
@@ -29,7 +30,7 @@
     <meta property="og:url" content="https://tagvico.arturf.ch/">
     <meta property="og:image" content="https://tagvico.arturf.ch/tagvico-icon.png">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Tagvico — Turn your Paperless archive into useful work">
+    <meta name="twitter:title" content="Tagvico: Turn your Paperless archive into useful work">
     <meta
       name="twitter:description"
       content="Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx."
@@ -42,7 +43,7 @@
         "name": "Tagvico",
         "applicationCategory": "DocumentManagementApplication",
         "operatingSystem": "Docker",
-        "softwareVersion": "3.2.0",
+        "softwareVersion": "3.2.5",
         "description": "Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx.",
         "url": "https://tagvico.arturf.ch/",
         "downloadUrl": "https://github.com/arturict/tagvico-ai/releases",
@@ -841,6 +842,46 @@
         font-size: 0.79rem;
       }
 
+      .usage-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) repeat(2, minmax(180px, .75fr));
+        gap: 12px;
+        align-items: stretch;
+        margin-top: 18px;
+      }
+
+      .usage-copy,
+      .usage-metric {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .usage-copy p,
+      .usage-metric p {
+        margin: 0;
+        color: var(--muted);
+        font-size: .79rem;
+      }
+
+      .usage-metric strong {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--pine);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(1.45rem, 3vw, 2.2rem);
+        font-weight: 500;
+        line-height: 1;
+      }
+
+      .usage-metric span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: .68rem;
+      }
+
       .docs-callout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -1082,7 +1123,8 @@
         }
 
         .workflow-grid,
-        .architecture {
+        .architecture,
+        .usage-panel {
           grid-template-columns: 1fr;
         }
 
@@ -1971,8 +2013,8 @@
 
     <div class="release-note" role="status">
       <div class="container">
-        <span class="release-pill">v3.2.0</span>
-        <span>A calmer workspace, visible Companion research, clearer tag cleanup, and one consistent Paper &amp; Pine interface.</span>
+        <span class="release-pill">v3.2.5</span>
+        <span>Verified setup, source-linked answers, safer recovery, and privacy-first aggregate usage signals.</span>
       </div>
     </div>
 
@@ -1984,7 +2026,7 @@
             <h1>Documents in.<br><span>Useful work out.</span></h1>
             <p class="hero-lede">
               Tagvico files documents, researches your Paperless archive, turns letters into trackable actions,
-              and keeps your tags clean—while every sensitive change remains visible and under your control.
+              and keeps your tags clean while every sensitive change remains visible and under your control.
             </p>
             <div class="actions">
               <a class="button primary" href="#workflows">Explore the workflows <span aria-hidden="true">↓</span></a>
@@ -2289,6 +2331,26 @@
               <p>Model selection, tool activity, sources, retries, and applied changes stay understandable.</p>
             </article>
           </div>
+          <div class="usage-panel" aria-labelledby="usage-heading">
+            <div class="usage-copy">
+              <p class="eyebrow">Transparent, privacy-first signals</p>
+              <h3 id="usage-heading">Usage without visitor profiles.</h3>
+              <p>
+                Landing traffic and product activity are different signals. Tagvico counts page requests without
+                cookies or visitor IDs. Product activity includes only installations that explicitly enable anonymous analytics.
+              </p>
+            </div>
+            <div class="usage-metric">
+              <strong data-metric="pageviews">Loading</strong>
+              <p>Landing page views in the last 30 days</p>
+              <span>Requests, not unique people</span>
+            </div>
+            <div class="usage-metric">
+              <strong data-metric="installations">Loading</strong>
+              <p>Opt-in installation reports this month</p>
+              <span>Unauthenticated; small totals are suppressed</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2348,7 +2410,8 @@
             <h2>Start beside Paperless.</h2>
             <p>
               Pin the stable image, keep the data volume, and complete the guided setup in your browser.
-              The current 3.2 image uses the same persistent data volume. Pin the immutable tag so upgrades stay deliberate and rollback remains simple.
+              Version 3.2.5 checks Paperless permissions and the runtime's live model catalog before saving.
+              It uses the same persistent v3 data volume. Pin the immutable tag so upgrades stay deliberate and rollback remains simple.
             </p>
             <div class="actions" style="justify-content:flex-start">
               <a class="button primary" href="/docs/installation">Installation guide</a>
@@ -2363,10 +2426,12 @@
               </div>
               <pre><code>services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.0
+    image: ghcr.io/arturict/tagvico-ai:3.2.5
     restart: unless-stopped
     ports:
       - "8080:3000"
+    environment:
+      ALLOW_REMOTE_SETUP: "yes"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -2374,7 +2439,9 @@ volumes:
   tagvico_ai_data:</code></pre>
             </div>
             <p class="install-note">
-              Then open <strong>http://localhost:8080/setup</strong>. Back up the data volume before every upgrade.
+              Then open <strong>http://localhost:8080/setup</strong>. After setup succeeds, remove
+              <strong>ALLOW_REMOTE_SETUP</strong> and recreate the container. The named volume keeps your configuration.
+              Back up the data volume before every upgrade.
             </p>
           </div>
         </div>
@@ -2396,10 +2463,12 @@ volumes:
     <script>
       const composeSnippet = `services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.0
+    image: ghcr.io/arturict/tagvico-ai:3.2.5
     restart: unless-stopped
     ports:
       - "8080:3000"
+    environment:
+      ALLOW_REMOTE_SETUP: "yes"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -2420,6 +2489,48 @@ volumes:
           }
         });
       });
+
+      const metricsEndpoint = document.querySelector('meta[name="tagvico-metrics-endpoint"]')?.content;
+      const pageviewsMetric = document.querySelector('[data-metric="pageviews"]');
+      const installationsMetric = document.querySelector('[data-metric="installations"]');
+      const privacySignalEnabled = navigator.globalPrivacyControl !== true
+        && navigator.doNotTrack !== "1"
+        && window.doNotTrack !== "1";
+
+      const showMetricsUnavailable = () => {
+        pageviewsMetric.textContent = "Unavailable";
+        installationsMetric.textContent = "Unavailable";
+      };
+
+      if (metricsEndpoint && location.origin === "https://tagvico.arturf.ch") {
+        if (privacySignalEnabled) {
+          fetch(`${metricsEndpoint}/v1/pageview`, {
+            method: "POST",
+            credentials: "omit",
+            referrerPolicy: "no-referrer",
+            keepalive: true
+          }).catch(() => {});
+        }
+        fetch(`${metricsEndpoint}/v1/public-summary`, {
+          credentials: "omit",
+          referrerPolicy: "no-referrer"
+        })
+          .then((response) => {
+            if (!response.ok) throw new Error("Metrics unavailable");
+            return response.json();
+          })
+          .then((summary) => {
+            pageviewsMetric.textContent = Number(summary.landing_pageviews?.value || 0).toLocaleString();
+            const installations = summary.opted_in_active_installations;
+            installationsMetric.textContent = installations?.publication === "below_threshold"
+              ? `<${installations.threshold}`
+              : Number(installations?.value || 0).toLocaleString();
+          })
+          .catch(showMetricsUnavailable);
+      } else {
+        pageviewsMetric.textContent = "Preview";
+        installationsMetric.textContent = "Preview";
+      }
     </script>
   </body>
 </html>

@@ -1,0 +1,114 @@
+name: tagvico-e2e
+
+services:
+  paperless-broker:
+    image: docker.io/library/redis:8
+    restart: "no"
+    volumes:
+      - paperless_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  paperless-db:
+    image: docker.io/library/postgres:18
+    restart: "no"
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: tagvico-e2e-database
+    volumes:
+      - paperless_postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  paperless-ngx:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+    restart: "no"
+    depends_on:
+      paperless-db:
+        condition: service_healthy
+      paperless-broker:
+        condition: service_healthy
+    ports:
+      - "${TAGVICO_E2E_PAPERLESS_PORT:-4311}:8000"
+    environment:
+      PAPERLESS_REDIS: redis://paperless-broker:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBPASS: tagvico-e2e-database
+      PAPERLESS_SECRET_KEY: tagvico-e2e-synthetic-secret
+      PAPERLESS_URL: http://localhost:${TAGVICO_E2E_PAPERLESS_PORT:-4311}
+      PAPERLESS_TIME_ZONE: Europe/Zurich
+      PAPERLESS_OCR_LANGUAGE: eng
+      PAPERLESS_ADMIN_USER: tagvico-e2e
+      PAPERLESS_ADMIN_PASSWORD: tagvico-e2e-password
+      PAPERLESS_ADMIN_MAIL: tagvico-e2e@example.test
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  release-mock:
+    image: docker.io/library/node:22-slim
+    restart: "no"
+    working_dir: /workspace
+    command: ["node", "tests/fixtures/release-mock-server.mjs"]
+    environment:
+      PORT: "4010"
+      TAGVICO_ACCEPTANCE_PAPERLESS_URL: http://paperless-ngx:8000
+      TAGVICO_ACCEPTANCE_PAPERLESS_USERNAME: tagvico-e2e
+      TAGVICO_ACCEPTANCE_PAPERLESS_PASSWORD: tagvico-e2e-password
+    volumes:
+      - .:/workspace:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4010/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  tagvico-ai:
+    build:
+      context: .
+    image: tagvico-ai:e2e-local
+    restart: "no"
+    depends_on:
+      paperless-ngx:
+        condition: service_healthy
+      release-mock:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges=true
+    environment:
+      TAGVICO_AI_PORT: "3000"
+      ALLOW_REMOTE_SETUP: "yes"
+      COOKIE_SECURE_MODE: never
+    ports:
+      - "${TAGVICO_E2E_APP_PORT:-4310}:3000"
+    volumes:
+      - tagvico_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  paperless_data:
+  paperless_media:
+  paperless_postgres:
+  paperless_redis:
+  tagvico_data:

@@ -62,7 +62,7 @@ which account-scoped model is active, and which vocabulary the model may use.
 
 <p align="center"><em>Sanitized v3.2 screens from a representative installation. No document contents, credentials, endpoints, or account identifiers are shown.</em></p>
 
-## Stable quick start (v3.2.0)
+## Stable quick start (v3.2.5)
 
 Use only immutable tags that are present on the
 [GitHub releases page](https://github.com/arturict/tagvico-ai/releases).
@@ -76,7 +76,7 @@ services:
   tagvico-ai:
     # Pin an immutable release tag for upgrades you can rely on.
     # See https://github.com/arturict/tagvico-ai/releases for the current version.
-    image: ghcr.io/arturict/tagvico-ai:3.2.0
+    image: ghcr.io/arturict/tagvico-ai:3.2.5
     container_name: tagvico-ai
     restart: unless-stopped
     cap_drop:
@@ -111,7 +111,7 @@ require the separately hosted documentation site.
 1. **Start the container.** Run `docker compose up -d`, then open <http://localhost:8080/setup>.
 2. **Connect Paperless-ngx.** Paste its base URL and an API token (Paperless-ngx → Settings → My API token). Do not add `/api` to the URL. If Paperless runs on the Docker host, use `http://host.docker.internal:<port>` on Docker Desktop or the host's LAN IP on Linux. If both apps share a Docker network, use the Paperless service name.
 3. **Choose a model provider.** Pick OpenRouter for the fastest curated start, Ollama to keep everything on your own hardware, or any other supported provider (see below). Add the required key or endpoint.
-4. **Choose the write mode and fields.** Pick **Review first** to queue every suggestion for approval, or **Automatic** to let Tagvico write validated metadata directly as it did before. Then choose tags, title, correspondent, document type, custom fields, and optional owner assignment. You can switch modes later without restarting Tagvico.
+4. **Create the owner and review the safe start.** Setup starts new installations in **Review first** mode with scheduled scans paused. After sign-in, open **Settings** to choose writable fields, enable a schedule, or switch metadata filing to **Automatic** when representative documents have been verified. Ask Tagvico writes always remain approval-gated.
 
 The first run creates a tiny local admin account, stored in the SQLite database inside the persistent volume.
 
@@ -129,7 +129,7 @@ docker run -d \
   -e TAGVICO_AI_PORT=3000 \
   -e ALLOW_REMOTE_SETUP=yes \
   -v tagvico_ai_data:/app/data \
-  ghcr.io/arturict/tagvico-ai:3.2.0
+  ghcr.io/arturict/tagvico-ai:3.2.5
 ```
 
 After setup succeeds, remove and recreate the container without
@@ -219,7 +219,7 @@ Activity supports single and bulk rescan, exact restoration of the first metadat
 ## Upgrades
 
 1. Check the latest release at <https://github.com/arturict/tagvico-ai/releases>.
-2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page—for example `ghcr.io/arturict/tagvico-ai:3.2.0`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
+2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page, for example `ghcr.io/arturict/tagvico-ai:3.2.5`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
 3. `docker compose pull && docker compose up -d`.
 
 The container is replaceable, while configuration, processing history, the local admin account, encrypted member tokens, and the installation secret live in the `tagvico_ai_data` volume. Back up and restore that volume as one unit; changing or losing the JWT secret makes encrypted member tokens unreadable.

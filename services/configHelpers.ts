@@ -93,9 +93,11 @@ function buildUiConfig(env: Environment = process.env, version = '') {
     OPENROUTER_API_KEY_CONFIGURED: Boolean(env.OPENROUTER_API_KEY || env.OPENAI_API_KEY),
     OPENROUTER_MODEL: env.OPENROUTER_MODEL || env.AI_MODEL || getDefaultModel('openrouter'),
     OLLAMA_API_URL: env.OLLAMA_API_URL || 'http://localhost:11434',
+    OLLAMA_API_KEY: '',
+    OLLAMA_API_KEY_CONFIGURED: Boolean(env.OLLAMA_API_KEY),
     OLLAMA_MODEL: env.OLLAMA_MODEL || getDefaultModel('ollama'),
     OLLAMA_CLOUD_API_KEY: '',
-    OLLAMA_CLOUD_API_KEY_CONFIGURED: Boolean(env.OLLAMA_CLOUD_API_KEY || env.OLLAMA_API_KEY),
+    OLLAMA_CLOUD_API_KEY_CONFIGURED: Boolean(env.OLLAMA_CLOUD_API_KEY),
     OLLAMA_CLOUD_API_URL: env.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
     OLLAMA_CLOUD_MODEL: env.OLLAMA_CLOUD_MODEL || getDefaultModel('ollama-cloud'),
     OPENCODE_API_KEY: '',
@@ -168,8 +170,13 @@ function normalizeProviderPayload(payload: ConfigLike = {}) {
     payload.anthropicModel ||
     payload.codexModel ||
     payload.customModel ||
+    payload.AI_MODEL ||
     payload.OPENROUTER_MODEL ||
     payload.OLLAMA_MODEL ||
+    payload.OLLAMA_CLOUD_MODEL ||
+    payload.OPENCODE_MODEL ||
+    payload.COPILOT_MODEL ||
+    payload.CODEX_MODEL ||
     payload.COMPATIBLE_MODEL ||
     payload.OPENAI_MODEL ||
     payload.CUSTOM_MODEL ||
@@ -183,9 +190,11 @@ function normalizeProviderPayload(payload: ConfigLike = {}) {
     provider,
     selectedModel,
     openrouterApiKey: payload.openrouterApiKey || payload.OPENROUTER_API_KEY || payload.openaiKey || payload.OPENAI_API_KEY || '',
+    openrouterBaseUrl: payload.openrouterBaseUrl || payload.OPENROUTER_BASE_URL || '',
     ollamaUrl: payload.ollamaUrl || payload.OLLAMA_API_URL || 'http://localhost:11434',
+    ollamaApiKey: payload.ollamaApiKey || payload.OLLAMA_API_KEY || '',
     ollamaCloudUrl: payload.ollamaCloudUrl || payload.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
-    ollamaCloudApiKey: payload.ollamaCloudApiKey || payload.OLLAMA_CLOUD_API_KEY || payload.OLLAMA_API_KEY || '',
+    ollamaCloudApiKey: payload.ollamaCloudApiKey || payload.OLLAMA_CLOUD_API_KEY || '',
     opencodeBaseUrl: payload.opencodeBaseUrl || payload.OPENCODE_BASE_URL || 'https://opencode.ai/zen/go/v1',
     opencodeApiKey: payload.opencodeApiKey || payload.OPENCODE_API_KEY || '',
     copilotGitHubToken: payload.copilotGitHubToken || payload.COPILOT_GITHUB_TOKEN || payload.GITHUB_TOKEN || '',

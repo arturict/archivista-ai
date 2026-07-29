@@ -15,6 +15,11 @@ interface TelemetryState {
 
 const statePath = path.join(resolveDataDirectory(), 'telemetry.json');
 let timer: NodeJS.Timeout | null = null;
+let active = false;
+let scheduleGeneration = 0;
+const MINUTE_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const MAX_SHORT_RETRIES = 2;
 
 function enabled(env = process.env): boolean {
   return ['yes', 'true', '1', 'on'].includes(String(env.TAGVICO_TELEMETRY_ENABLED || '').toLowerCase());
@@ -75,22 +80,56 @@ async function sendNow() {
   return { sent: true };
 }
 
-function start() {
-  if (timer) return;
-  const run = () => sendNow().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn('[TELEMETRY] Heartbeat was not sent:', message);
-  });
-  timer = setTimeout(() => {
-    void run();
-    timer = setInterval(run, 24 * 60 * 60 * 1000);
-  }, 15 * 60 * 1000);
+function jitteredDelay(
+  baseMs: number,
+  jitterMs: number,
+  random: () => number = Math.random
+) {
+  const sample = Math.max(0, Math.min(0.999999, random()));
+  return baseMs + Math.floor(sample * jitterMs);
+}
+
+function retryableStatus(status?: number) {
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
+
+function schedule(delayMs: number, generation: number, retriesRemaining = MAX_SHORT_RETRIES) {
+  if (!active || generation !== scheduleGeneration) return;
+  timer = setTimeout(async () => {
+    timer = null;
+    try {
+      await sendNow();
+      schedule(jitteredDelay(DAY_MS, 60 * MINUTE_MS), generation, MAX_SHORT_RETRIES);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('[TELEMETRY] Heartbeat was not sent:', message);
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (retriesRemaining > 0 && retryableStatus(status)) {
+        schedule(
+          jitteredDelay(5 * MINUTE_MS, 10 * MINUTE_MS),
+          generation,
+          retriesRemaining - 1
+        );
+      } else {
+        schedule(jitteredDelay(DAY_MS, 60 * MINUTE_MS), generation, MAX_SHORT_RETRIES);
+      }
+    }
+  }, delayMs);
   timer.unref?.();
+}
+
+function start() {
+  if (active) return;
+  active = true;
+  scheduleGeneration += 1;
+  schedule(jitteredDelay(15 * MINUTE_MS, 45 * MINUTE_MS), scheduleGeneration);
 }
 
 function stop() {
   if (timer) clearTimeout(timer);
   timer = null;
+  active = false;
+  scheduleGeneration += 1;
 }
 
-export = { buildPayload, enabled, sendNow, start, stop };
+export = { buildPayload, enabled, jitteredDelay, retryableStatus, sendNow, start, stop };

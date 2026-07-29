@@ -9,10 +9,11 @@ export const metadata = { title: 'Ask Tagvico' };
 export default async function CompanionPage({
   searchParams
 }: {
-  searchParams: Promise<{ chat?: string }>;
+  searchParams: Promise<{ chat?: string; welcome?: string }>;
 }) {
   const user = await requireUser(); const workspace = workspaceFor(user);
-  const requestedSessionId = String((await searchParams).chat || '').trim();
+  const params = await searchParams;
+  const requestedSessionId = String(params.chat || '').trim();
   const requestedSession = requestedSessionId
     ? actionCenter.getSession(workspace.householdId, requestedSessionId) as { member_id?: unknown } | null
     : null;
@@ -58,5 +59,7 @@ export default async function CompanionPage({
     initialApprovals={JSON.parse(JSON.stringify(approvals))}
     initialSessions={JSON.parse(JSON.stringify(sessions))}
     canApprove={['owner', 'adult'].includes(workspace.role)}
+    renderedAt={Date.now()}
+    showFirstRun={params.welcome === '1'}
   /></div>;
 }

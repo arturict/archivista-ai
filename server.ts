@@ -769,6 +769,14 @@ app.use((err: Error, _req: HttpRequest, res: HttpResponse, _next: NextFunction) 
 // Start scanning
 async function startScanning() {
   try {
+    // Register the watcher even before first-run setup is complete. Scheduled
+    // callbacks remain inert until setup closes, while later Settings writes
+    // can enable or change the scan schedule without restarting the process.
+    scanScheduler.register(async () => {
+      if (!await setupService.isConfigured()) return;
+      await scanDocuments();
+    }, () => setupService.reloadRuntimeConfig());
+
     const isConfigured = await setupService.isConfigured();
     if (!isConfigured) {
       const port = resolveEnv('TAGVICO_AI_PORT', 'ARCHIVISTA_AI_PORT') || 3000;
@@ -787,7 +795,6 @@ async function startScanning() {
     if(config.disableAutomaticProcessing != 'yes') {
       await scanInitial();
     }
-    scanScheduler.register(scanDocuments, () => setupService.reloadRuntimeConfig());
     if (config.reconciliationEnabled === 'yes') {
       const reconciliationService = require('./services/reconciliationService');
       cron.schedule(config.reconciliationInterval, async () => {

@@ -1,5 +1,58 @@
 # Changelog
 
+## 3.2.5 - 2026-07-29
+
+### Safer first run
+
+- Replace blind setup saves with live Paperless permission checks, provider
+  authentication, model discovery, and exact selected-model verification.
+- Prefill built-in endpoints, support authenticated Ollama installations, and
+  keep local and cloud Ollama credentials separate at validation and runtime.
+- Validate Docker- and host-injected connection values as the effective runtime
+  configuration, even when a stale browser value is submitted.
+- Watch the scan configuration before first-run setup completes, so enabling a
+  schedule later in Settings takes effect without restarting the container.
+- Expire abandoned ChatGPT device sign-ins server-side, terminate their Codex
+  process before allowing another challenge, and rate-limit new login processes.
+- Let non-secret setup progress resume in the same browser tab while keeping
+  API tokens, passwords, provider keys, and account credentials out of the
+  browser draft.
+- Start new installations in Review first mode with scheduled scans paused, and
+  take a successful setup directly to Ask Tagvico for the first useful question.
+- Bound provider probe time, response bytes, catalog entries, concurrency,
+  account sign-in, setup admission, and pending work so one failed or hostile
+  endpoint cannot block later setup attempts.
+- Check Paperless permissions concurrently and persist the already verified
+  setup once, keeping the browser and backend on one completion deadline.
+
+### Documents, answers, and recovery
+
+- Link safe Ask Tagvico sources to their Paperless-backed document views so an
+  answer can be checked against the permitted original.
+- Preserve authentication, rate-limit, and transient Paperless failures as
+  retryable errors instead of misreporting valid sources as missing documents.
+- Keep source inspection, global rescans, manual processing, owner recovery,
+  and provider changes consistent after interruptions or stale browser requests.
+- Improve loading, empty, retry, and narrow-screen states across setup,
+  Documents, Ask Tagvico, Activity, and Settings.
+
+### Privacy and release confidence
+
+- Add separate first-party aggregate counters for landing requests and opted-in
+  installation reports without cookies, fingerprinting, referrers, stored IP
+  addresses, or permanent installation identifiers.
+- Respect Global Privacy Control and Do Not Track on the landing page, suppress
+  small installation totals, and document the Swiss and EU assessment without
+  presenting unauthenticated reports as verified people.
+- Exercise setup, document search, cited answers, tag changes, approval-first
+  actions, cleanup, and recovery against an isolated real Paperless-ngx 2.20.15
+  container with synthetic documents.
+
+### Upgrade note
+
+- Back up `tagvico_ai_data`, pull the pinned `3.2.5` image and recreate the
+  Tagvico container. This is a v3 patch with no data migration.
+
 ## 3.2.0 - 2026-07-26
 
 ### Paper & Pine interface

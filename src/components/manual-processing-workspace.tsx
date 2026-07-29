@@ -197,7 +197,7 @@ export function ManualProcessingWorkspace() {
         <label><span>Tags</span><textarea className="field" rows={4} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="invoice, utilities, personal" /><small>Comma-separated. Nothing is written until you save.</small></label>
 
         <div className="workspace-actions">
-          <button className="button" type="button" disabled={options.canMutate !== true || !previewReady || Boolean(busy)} onClick={() => void analyze()}><Bot aria-hidden="true" /> {busy === 'analyzing' ? 'Analyzing…' : 'Suggest with AI'}</button>
+          <button className="button" type="button" disabled={options.canMutate !== true || !previewReady || !content.trim() || Boolean(busy)} onClick={() => void analyze()}><Bot aria-hidden="true" /> {busy === 'analyzing' ? 'Analyzing…' : 'Suggest with AI'}</button>
           <button className="button primary" type="button" disabled={options.canMutate !== true || !previewReady || Boolean(busy)} onClick={() => void save()}><Save aria-hidden="true" /> {busy === 'saving' ? 'Saving…' : 'Save to Paperless'}</button>
         </div>
       </article>

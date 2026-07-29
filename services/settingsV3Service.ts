@@ -7,6 +7,7 @@ import {
   applyPersistedAiSelection,
   UI_MANAGED_AI_SELECTION_KEY
 } from './managedAiSelection';
+import providerDiscoveryService from './providerDiscoveryService';
 import setupService from './setupService';
 
 const providerRegistryModule = require('./providerRegistry');
@@ -156,8 +157,7 @@ function revisionFor(env: Environment): string {
     .slice(0, 24);
 }
 
-async function environment(): Promise<{ persisted: Environment; effective: Environment }> {
-  const persisted = (await setupService.loadConfig()) || {};
+function effectiveEnvironment(persisted: Environment): Environment {
   const effective = { ...persisted };
   // Non-empty values injected by Docker or the host win over the persisted
   // .env file. Compose often expands optional variables to an empty string;
@@ -168,6 +168,12 @@ async function environment(): Promise<{ persisted: Environment; effective: Envir
     if (injectedValue) effective[key] = injectedValue;
   }
   applyPersistedAiSelection(effective, persisted);
+  return effective;
+}
+
+async function environment(): Promise<{ persisted: Environment; effective: Environment }> {
+  const persisted = (await setupService.loadConfig()) || {};
+  const effective = effectiveEnvironment(persisted);
   return {
     persisted,
     effective
@@ -444,7 +450,34 @@ async function patchSettings(input: unknown) {
     throw new RevisionConflictError('Settings changed in another session. Reload before saving again.');
   }
   const patch = applySectionPatch(parsed, effective);
-  if (Object.keys(patch).length) await setupService.savePartialConfig(patch);
+  const selectionChanged = parsed.patch.ai?.activeProviderInstanceId !== undefined
+    || parsed.patch.ai?.activeModelId !== undefined;
+  const activeProviderId = String(patch.AI_PROVIDER || effective.AI_PROVIDER || 'openrouter').trim();
+  const activeCopilotCredentialsChanged = activeProviderId === 'copilot'
+    && parsed.patch.provider?.instanceId === 'copilot';
+  if ((selectionChanged || activeCopilotCredentialsChanged) && ['codex', 'copilot'].includes(activeProviderId)) {
+    const definition = providerRegistry.getProviderDefinition(activeProviderId);
+    const candidateEnvironment = effectiveEnvironment({ ...effective, ...patch });
+    const selectedModelId = definition
+      ? providerRegistry.getConfiguredModel(definition, candidateEnvironment)
+      : '';
+    const availableModels = await providerDiscoveryService.discoverProviderModels(
+      activeProviderId,
+      candidateEnvironment
+    );
+    if (!selectedModelId || !availableModels.some((model: { id: string }) => model.id === selectedModelId)) {
+      throw new Error('The selected model is not available to this runtime account.');
+    }
+  }
+  if (Object.keys(patch).length) {
+    await setupService.savePartialConfig(patch, {
+      validateCurrent: (current) => {
+        if (revisionFor(effectiveEnvironment(current)) !== parsed.revision) {
+          throw new RevisionConflictError('Settings changed in another session. Reload before saving again.');
+        }
+      }
+    });
+  }
   return getSettings();
 }
 

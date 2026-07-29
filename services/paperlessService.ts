@@ -15,6 +15,7 @@ interface NamedResource { id: number; name: string; [key: string]: unknown }
 interface ProcessingOptions { restrictToExistingTags?: boolean; restrictToExistingCorrespondents?: boolean }
 interface DocumentUpdate { [key: string]: unknown; tags?: number[]; title?: string; created?: string; correspondent?: unknown }
 const MAX_THUMBNAIL_BYTES = 10 * 1024 * 1024;
+const PAPERLESS_REQUEST_TIMEOUT_MS = 15_000;
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -54,6 +55,7 @@ class PaperlessService {
     if (!this.client && config.paperless.apiUrl && config.paperless.apiToken) {
       this.client = axios.create({
         baseURL: config.paperless.apiUrl,
+        timeout: PAPERLESS_REQUEST_TIMEOUT_MS,
         headers: {
           'Authorization': `Token ${config.paperless.apiToken}`,
           'Content-Type': 'application/json'
@@ -169,6 +171,7 @@ class PaperlessService {
   async initializeWithCredentials(apiUrl: string, apiToken: string) {
     this.client = axios.create({
       baseURL: apiUrl,
+      timeout: PAPERLESS_REQUEST_TIMEOUT_MS,
       headers: {
         'Authorization': `Token ${apiToken}`,
         'Content-Type': 'application/json'
@@ -607,7 +610,7 @@ class PaperlessService {
     }
   }
 
-  async listCorrespondentsNames() {
+  async listCorrespondentsNames({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     let allCorrespondents: NamedResource[] = [];
     let page = 1;
@@ -648,11 +651,12 @@ class PaperlessService {
   
     } catch (error) {
       console.error('[ERROR] fetching correspondent names:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }
 
-  async listDocumentTypesNames() {
+  async listDocumentTypesNames({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     let allDocumentTypes: NamedResource[] = [];
     let page = 1;
@@ -689,6 +693,7 @@ class PaperlessService {
   
     } catch (error) {
       console.error('[ERROR] fetching document type names:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }
@@ -1360,7 +1365,7 @@ async getOrCreateDocumentType(name: string) {
     }
   }
 
-  async getUsers() {
+  async getUsers({ throwOnError = false }: { throwOnError?: boolean } = {}) {
     this.initialize();
     try {
       let users: Record<string, unknown>[] = [];
@@ -1384,6 +1389,7 @@ async getOrCreateDocumentType(name: string) {
       return users;
     } catch (error) {
       console.error('[ERROR] fetching users:', errorMessage(error));
+      if (throwOnError) throw error;
       return [];
     }
   }

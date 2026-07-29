@@ -11,7 +11,7 @@ Create a new directory and save this as `docker-compose.yml`:
 ```yaml
 services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.0
+    image: ghcr.io/arturict/tagvico-ai:3.2.5
     container_name: tagvico-ai
     restart: unless-stopped
     cap_drop:
@@ -53,13 +53,23 @@ the image you pinned even when the public website changes.
 
 ## 3. Finish guided setup
 
-1. Enter the Paperless base URL without `/api`, then paste a Paperless API token
-   and test the connection.
-2. Choose a [model provider](./providers) and enter its credentials or endpoint.
-3. Create the local Tagvico owner account.
-4. After signing in, use **Settings → Automation** to select **Review first**
-   for approval-based filing or **Automatic** for direct writes, then choose
-   which metadata fields Tagvico may change.
+1. Enter the Paperless base URL without `/api`, then paste a Paperless API
+   token. Setup checks the connection and the read permissions Tagvico needs
+   before continuing.
+2. Choose a [model provider](./providers). Built-in endpoints are prefilled.
+   Setup verifies the connection and loads its live model catalog.
+3. Select one of the verified models and create the local Tagvico owner
+   account. Non-secret progress can resume in the same browser tab after an
+   interruption; tokens, passwords, and provider secrets are never stored in
+   that browser draft.
+4. The safe first-run default is **Review first** with scheduled scans paused.
+   Ask Tagvico can read immediately, while every proposed write still needs an
+   explicit approval. Enable a schedule or Automatic metadata filing only
+   after validating representative documents.
+
+After setup succeeds, remove `ALLOW_REMOTE_SETUP` from the Compose file and run
+`docker compose up -d` again. Compose recreates the container with remote setup
+locked down, while the named volume keeps your configuration and data.
 
 After saving the provider, inspect the detailed application health response.
 Unlike `/health`, this endpoint reports the configured model adapter's health
@@ -69,10 +79,10 @@ when that adapter exposes a health check:
 curl --fail http://localhost:8080/api/health
 ```
 
-Some compatible and subscription-backed adapters report their health as
-unknown rather than making a billable test request. Use the **Test connection**
-actions in Settings to verify both Paperless and the selected model provider
-before processing documents.
+Some subscription-backed adapters require their separate account sign-in flow
+and may report health as unknown rather than making a billable test request.
+Use the **Test connection** actions in Settings after authentication and before
+processing documents.
 
 If Paperless runs on the Docker host, use `host.docker.internal` on Docker
 Desktop or the host's LAN address on Linux. If both containers share a Docker
@@ -129,7 +139,7 @@ docker run -d \
   -e TAGVICO_AI_PORT=3000 \
   -e ALLOW_REMOTE_SETUP=yes \
   -v tagvico_ai_data:/app/data \
-  ghcr.io/arturict/tagvico-ai:3.2.0
+  ghcr.io/arturict/tagvico-ai:3.2.5
 ```
 
 After setup, remove `ALLOW_REMOTE_SETUP=yes` unless you specifically need to

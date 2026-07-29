@@ -99,6 +99,7 @@ export function SettingsWorkspace({
   const [settings, setSettings] = useState(initialSettings);
   const settingsRef = useRef(initialSettings);
   const mutationQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const providerSelectionId = useRef(0);
   const toastTimer = useRef<number | null>(null);
   const codexPollTimer = useRef<number | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -179,16 +180,43 @@ export function SettingsWorkspace({
       const response = await fetch(`/api/providers/${encodeURIComponent(instanceId)}/models`, { cache: 'no-store' });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Could not load models.');
-      setModelsByProvider((current) => ({ ...current, [instanceId]: body.models || [] }));
+      const models = (body.models || []) as ModelDescriptor[];
+      setModelsByProvider((current) => ({ ...current, [instanceId]: models }));
+      return models;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not load models.';
       setModelsError(message);
+      return [];
     } finally {
       setModelsLoading(false);
     }
   };
 
   const selectProvider = async (instanceId: string) => {
+    const selectionId = ++providerSelectionId.current;
+    if (['codex', 'copilot'].includes(instanceId)) {
+      const models = await loadModels(instanceId);
+      if (selectionId !== providerSelectionId.current) return;
+      const selectedModel = models.find((model) => model.id === settingsRef.current.ai.activeModelId)
+        || models.find((model) => model.isDefault)
+        || models[0];
+      if (!selectedModel) {
+        showMessage('error', 'Connect this account and load an available model before selecting it.');
+        return;
+      }
+      const defaults = Object.fromEntries(selectedModel.options.map((option) => [
+        option.id,
+        option.defaultValue ?? (option.type === 'select' ? option.values[0]?.id : false)
+      ]));
+      await applyPatch({
+        ai: {
+          activeProviderInstanceId: instanceId,
+          activeModelId: selectedModel.id,
+          ...(Object.keys(defaults).length ? { modelOptions: defaults } : {})
+        }
+      }, `${selectedModel.name} selected.`);
+      return;
+    }
     const saved = await applyPatch({ ai: { activeProviderInstanceId: instanceId } }, 'Provider selected.');
     if (saved) await loadModels(instanceId);
   };
@@ -549,7 +577,7 @@ export function SettingsWorkspace({
               loading={modelsLoading}
               error={modelsError}
               onProviderChange={selectProvider}
-              onRefresh={() => loadModels()}
+              onRefresh={async () => { await loadModels(); }}
               onSelect={selectModel}
             />
             {activeProvider?.manualModelInput ? <DraftField

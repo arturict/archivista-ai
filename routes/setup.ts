@@ -29,7 +29,7 @@ interface Res {
   status(code: number): Res;
   write(chunk: string): boolean;
 }
-type Next = () => unknown;
+type Next = (error?: unknown) => unknown;
 const router = express.Router();
 const axios = require('axios');
 const setupService = require('../services/setupService.js');
@@ -74,10 +74,13 @@ const tagExceptionService = require('../services/tagExceptionService');
 const controlledTaggingService = require('../services/controlledTaggingService');
 const { createRateLimiter } = require('../services/rateLimiter');
 const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'login' });
+const setupLimiter = createRateLimiter({ windowMs: 60_000, max: 10, keyPrefix: 'setup' });
+const codexLoginLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 5, keyPrefix: 'codex-login' });
 const totpService = require('../services/totpService');
 const pendingMfaSecrets = new Map();
 
 type UnknownRecord = Record<string, unknown>;
+type SetupProviderStatus = { ok: boolean; models: string[]; error?: string };
 interface NamedItem { id: number; name: string; model?: string; size?: number; modified_at?: string }
 interface DocumentData { id: number; title: string; created?: string; owner?: number; tags?: number[]; correspondent?: number; document_type?: number; custom_fields?: UnknownRecord[]; language?: string }
 interface AnalysisData {
@@ -99,6 +102,8 @@ const errorCode = (error: unknown): string | undefined => {
 };
 const firstString = (value: RequestValue | string | string[]): string | undefined =>
   typeof value === 'string' ? value : Array.isArray(value) && typeof value[0] === 'string' ? value[0] : undefined;
+const injectedEnvironmentValue = (name: string): string | undefined =>
+  setupService.injectedEnvironmentValue(name);
 const {
   buildUiConfig,
   normalizeArray,
@@ -238,13 +243,29 @@ let PUBLIC_ROUTES = [
 ];
 declare let runningTask: boolean;
 
+async function recoverCompletedSetup(): Promise<boolean> {
+  const configured = await setupService.isConfigured();
+  if (configured) return true;
+  if (!await documentModel.hasAnyUser()) return false;
+  // Owner creation is the final durable setup step. If the process exited
+  // before the marker write, close setup before routing the returning owner.
+  await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
+  return setupService.isConfigured();
+}
+
 // Combined middleware to check authentication and setup
 router.use(async (req: Req, res: Res, next: Next) => {
   const token = req.cookies.jwt || firstString(req.headers.authorization)?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
+  let configured: boolean;
+  try {
+    configured = await recoverCompletedSetup();
+  } catch (error) {
+    console.error('Could not recover interrupted setup:', error);
+    return next(error);
+  }
 
   if (req.path.startsWith('/setup')) {
-    const configured = await setupService.isConfigured().catch(() => false);
     const local = isLocalProxyRequest({ remoteAddress: req.socket?.remoteAddress, forwardedFor: firstString(req.headers['x-forwarded-for']) });
     if (!configured && !local && process.env.ALLOW_REMOTE_SETUP !== 'yes') {
       return res.status(403).send('Remote setup is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.');
@@ -276,17 +297,15 @@ router.use(async (req: Req, res: Res, next: Next) => {
 
   // Setup check
   try {
-    const isConfigured = await setupService.isConfigured();
-
     // API and health endpoints must never be redirected to an HTML page; they
     // return JSON and handle their own auth/setup gating (e.g. allowDuringSetup).
     const isApiRequest = req.path.startsWith('/api/') || req.path === '/health';
 
     if (!isApiRequest) {
       const initialSetup = resolveEnv('TAGVICO_AI_INITIAL_SETUP', 'ARCHIVISTA_AI_INITIAL_SETUP');
-      if (!isConfigured && (!initialSetup || initialSetup === 'no') && !req.path.startsWith('/setup')) {
+      if (!configured && (!initialSetup || initialSetup === 'no') && !req.path.startsWith('/setup')) {
         return res.redirect('/setup');
-      } else if (!isConfigured && initialSetup === 'yes' && !req.path.startsWith('/settings')) {
+      } else if (!configured && initialSetup === 'yes' && !req.path.startsWith('/settings')) {
         return res.redirect('/settings');
       }
     }
@@ -2052,7 +2071,7 @@ function buildConfigForSave(payload: Record<string, RequestValue>, options: Save
     USE_EXISTING_DATA: parseBooleanFlag(payload.useExistingData, currentConfig.USE_EXISTING_DATA || 'no'),
     DISABLE_AUTOMATIC_PROCESSING: parseBooleanFlag(payload.disableAutomaticProcessing, currentConfig.DISABLE_AUTOMATIC_PROCESSING || 'no'),
     OPENROUTER_API_KEY: providerPayload.openrouterApiKey || currentConfig.OPENROUTER_API_KEY || '',
-    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    OPENROUTER_BASE_URL: injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerPayload.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
     OPENROUTER_MODEL: providerPayload.provider === 'openrouter' ? providerPayload.selectedModel : currentConfig.OPENROUTER_MODEL || providerPayload.selectedModel,
     OPENAI_API_KEY: providerPayload.provider === 'openai' ? providerPayload.openaiApiKey : currentConfig.OPENAI_API_KEY || '',
     OPENAI_MODEL: providerPayload.provider === 'openai' ? providerPayload.selectedModel : currentConfig.OPENAI_MODEL || 'gpt-5.4-mini',
@@ -2061,6 +2080,7 @@ function buildConfigForSave(payload: Record<string, RequestValue>, options: Save
     CODEX_MODEL: providerPayload.provider === 'codex' ? providerPayload.selectedModel : currentConfig.CODEX_MODEL || 'gpt-5.4-mini',
     AI_PROCESSING_MODE: ['standard', 'flex', 'batch'].includes(String(payload.aiProcessingMode)) ? String(payload.aiProcessingMode) : (currentConfig.AI_PROCESSING_MODE || 'standard'),
     OLLAMA_API_URL: providerPayload.ollamaUrl || currentConfig.OLLAMA_API_URL || 'http://localhost:11434',
+    OLLAMA_API_KEY: providerPayload.provider === 'ollama' ? providerPayload.ollamaApiKey : currentConfig.OLLAMA_API_KEY || '',
     OLLAMA_MODEL: providerPayload.provider === 'ollama' ? providerPayload.selectedModel : currentConfig.OLLAMA_MODEL || 'llama3.2',
     OLLAMA_CLOUD_API_KEY: providerPayload.provider === 'ollama-cloud' ? providerPayload.ollamaCloudApiKey : currentConfig.OLLAMA_CLOUD_API_KEY || '',
     OLLAMA_CLOUD_API_URL: providerPayload.ollamaCloudUrl || currentConfig.OLLAMA_CLOUD_API_URL || 'https://ollama.com',
@@ -2321,6 +2341,27 @@ router.get('/manual/preview/:id', async (req: Req, res: Res) => {
  */
 router.get('/manual', (_req: Req, res: Res) => {
   res.status(410).json({ error: 'Legacy manual UI retired. Use the Next.js /automation/manual page.' });
+});
+
+router.get('/manual/options', async (_req: Req, res: Res) => {
+  try {
+    const [correspondents, documentTypes, users] = await Promise.all([
+      paperlessService.listCorrespondentsNames({ throwOnError: true }),
+      paperlessService.listDocumentTypesNames({ throwOnError: true }),
+      paperlessService.getUsers({ throwOnError: true })
+    ]);
+
+    res.json({
+      correspondents: correspondents.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+      documentTypes: documentTypes.map(({ id, name }: { id?: number; name?: string }) => ({ id, name })),
+      users: users.map(({ id, username }: { id?: number; username?: string }) => ({ id, username }))
+    });
+  } catch (error) {
+    console.error('[ERROR] Could not load manual Paperless options:', errorMessage(error));
+    res.status(502).json({
+      error: 'Paperless metadata options could not be loaded. Check the connection and retry.'
+    });
+  }
 });
 
 /**
@@ -3906,8 +3947,46 @@ router.get('/api/health', async (req: Req, res: Res) => {
  *                   type: string
  *                   example: "Failed to save configuration: Database error"
  */
-router.post('/setup', express.json(), async (req: Req, res: Res) => {
+let setupRequestQueue: Promise<void> = Promise.resolve();
+let setupPendingRequests = 0;
+const SETUP_MAX_PENDING_REQUESTS = 3;
+const SETUP_PROVIDER_TIMEOUT_MS = 15_000;
+
+async function acquireSetupRequestLock(): Promise<() => void> {
+  const previous = setupRequestQueue;
+  let release = () => {};
+  setupRequestQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  return release;
+}
+
+async function withSetupProviderTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error('Provider validation timed out. Retry the connection check.')),
+      SETUP_PROVIDER_TIMEOUT_MS
+    );
+  });
   try {
+    return await Promise.race([operation, deadline]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) => {
+  if (setupPendingRequests >= SETUP_MAX_PENDING_REQUESTS) {
+    return res.status(429).json({
+      error: 'Setup is already checking another connection. Wait a moment and retry.'
+    });
+  }
+  setupPendingRequests += 1;
+  let releaseSetupRequestLock: (() => void) | undefined;
+  try {
+    releaseSetupRequestLock = await acquireSetupRequestLock();
     // Setup is deliberately one-time. This route is public only for the first
     // local (or explicitly opted-in remote) bootstrap; accepting it after a
     // configuration exists would let an unauthenticated caller replace the
@@ -3915,6 +3994,14 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     if (await setupService.isConfigured()) {
       return res.status(409).json({
         error: 'Setup has already been completed. Sign in to change settings.'
+      });
+    }
+    if (await documentModel.hasAnyUser()) {
+      // Recover the only crash window between owner creation and the final
+      // setup marker. Never accept another public setup payload in this state.
+      await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
+      return res.status(409).json({
+        error: 'An owner account already exists. Setup has been closed; sign in to continue.'
       });
     }
 
@@ -3959,15 +4046,27 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     // Log setup request with sensitive data redacted
     const sensitiveKeys = [
       'paperlessToken',
+      'PAPERLESS_API_TOKEN',
       'openaiKey',
+      'OPENAI_API_KEY',
       'openrouterApiKey',
+      'OPENROUTER_API_KEY',
+      'ollamaApiKey',
+      'OLLAMA_API_KEY',
       'ollamaCloudApiKey',
+      'OLLAMA_CLOUD_API_KEY',
       'opencodeApiKey',
+      'OPENCODE_API_KEY',
       'copilotGitHubToken',
+      'COPILOT_GITHUB_TOKEN',
       'compatibleApiKey',
+      'COMPATIBLE_API_KEY',
       'customApiKey',
+      'CUSTOM_API_KEY',
       'anthropicApiKey',
+      'ANTHROPIC_API_KEY',
       'azureApiKey',
+      'AZURE_API_KEY',
       'password',
       'confirmPassword'
     ];
@@ -3979,10 +4078,14 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     );
     console.log('Setup request received:', redactedBody);
 
+    const effectiveSetupConfig = setupService.effectiveConfig(buildConfigForSave(req.body));
+    const effectivePaperlessUrl = String(effectiveSetupConfig.PAPERLESS_API_URL || '')
+      .replace(/\/api\/?$/i, '');
+    const effectivePaperlessToken = effectiveSetupConfig.PAPERLESS_API_TOKEN;
 
     // Initialize paperlessService with the new credentials
-    const paperlessApiUrl = paperlessUrl + '/api';
-    const initSuccess = await paperlessService.initializeWithCredentials(paperlessApiUrl, paperlessToken);
+    const paperlessApiUrl = effectivePaperlessUrl + '/api';
+    const initSuccess = await paperlessService.initializeWithCredentials(paperlessApiUrl, effectivePaperlessToken);
     
     if (!initSuccess) {
       return res.status(400).json({ 
@@ -3991,14 +4094,20 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     }
 
     // Validate Paperless credentials
-    const isPaperlessValid = await setupService.validatePaperlessConfig(paperlessUrl, paperlessToken);
+    const isPaperlessValid = await setupService.validatePaperlessConfig(
+      effectivePaperlessUrl,
+      effectivePaperlessToken
+    );
     if (!isPaperlessValid) {
       return res.status(400).json({ 
         error: 'Paperless-ngx connection failed. Please check URL and Token.'
       });
     }
 
-    const isPermissionValid = await setupService.validateApiPermissions(paperlessUrl, paperlessToken);
+    const isPermissionValid = await setupService.validateApiPermissions(
+      effectivePaperlessUrl,
+      effectivePaperlessToken
+    );
     if (!isPermissionValid.success) {
       return res.status(400).json({
         error: 'Paperless-ngx API permissions are insufficient. Error: ' + isPermissionValid.message
@@ -4039,73 +4148,109 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     }
 
     const providerConfig = normalizeProviderPayload(req.body);
+    const effectiveProvider = String(effectiveSetupConfig.AI_PROVIDER || providerConfig.provider);
 
-    if (providerConfig.provider === 'openrouter') {
+    if (effectiveProvider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
-        providerConfig.openrouterApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.OPENROUTER_API_KEY || effectiveSetupConfig.OPENAI_API_KEY,
+        effectiveSetupConfig.OPENROUTER_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OPENROUTER_BASE_URL || undefined
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenRouter connection failed. Please check the API key and selected model.'
         });
       }
-    } else if (providerConfig.provider === 'openai') {
-      const isValid = await setupService.validateOpenAIConfig(providerConfig.openaiApiKey);
+    } else if (effectiveProvider === 'openai') {
+      const isValid = await setupService.validateOpenAIConfig(
+        effectiveSetupConfig.OPENAI_API_KEY,
+        effectiveSetupConfig.OPENAI_MODEL || effectiveSetupConfig.AI_MODEL
+      );
       if (!isValid) {
         return res.status(400).json({
-          error: 'OpenAI API key is not valid. Please check the key.'
+          error: 'OpenAI connection failed. Please check the API key and selected model.'
         });
       }
-    } else if (providerConfig.provider === 'ollama') {
-      const isValid = await setupService.validateOllamaConfig(providerConfig.ollamaUrl, providerConfig.selectedModel);
+    } else if (effectiveProvider === 'ollama') {
+      const isValid = await setupService.validateOllamaConfig(
+        effectiveSetupConfig.OLLAMA_API_URL,
+        effectiveSetupConfig.OLLAMA_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OLLAMA_API_KEY
+      );
       if (!isValid) {
         return res.status(400).json({
           error: 'Ollama connection failed. Please check URL and model.'
         });
       }
-    } else if (providerConfig.provider === 'ollama-cloud') {
-      const isValid = await setupService.validateOllamaConfig(providerConfig.ollamaCloudUrl, providerConfig.selectedModel, providerConfig.ollamaCloudApiKey);
+    } else if (effectiveProvider === 'ollama-cloud') {
+      const isValid = await setupService.validateOllamaConfig(
+        effectiveSetupConfig.OLLAMA_CLOUD_API_URL,
+        effectiveSetupConfig.OLLAMA_CLOUD_MODEL || effectiveSetupConfig.AI_MODEL,
+        effectiveSetupConfig.OLLAMA_CLOUD_API_KEY
+      );
       if (!isValid) {
         return res.status(400).json({
           error: 'Ollama Cloud connection failed. Check the API key and cloud model.'
         });
       }
-    } else if (providerConfig.provider === 'opencode') {
+    } else if (effectiveProvider === 'opencode') {
       const isValid = await setupService.validateCustomConfig(
-        providerConfig.opencodeBaseUrl,
-        providerConfig.opencodeApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.OPENCODE_BASE_URL,
+        effectiveSetupConfig.OPENCODE_API_KEY,
+        effectiveSetupConfig.OPENCODE_MODEL || effectiveSetupConfig.AI_MODEL
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenCode Go connection failed. Check the service API key, gateway, and model ID.'
         });
       }
-    } else if (providerConfig.provider === 'copilot') {
-      const status = await copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken });
-      if (!status.ok) {
+    } else if (effectiveProvider === 'copilot') {
+      const status = await withSetupProviderTimeout<SetupProviderStatus>(
+        copilotService.healthcheck({ gitHubToken: effectiveSetupConfig.COPILOT_GITHUB_TOKEN })
+      ).catch((error): SetupProviderStatus => ({
+        ok: false,
+        models: [],
+        error: errorMessage(error)
+      }));
+      if (!status.ok || !status.models.includes(
+        effectiveSetupConfig.COPILOT_MODEL || effectiveSetupConfig.AI_MODEL
+      )) {
         return res.status(400).json({
-          error: `GitHub Copilot connection failed: ${status.error || 'sign in with copilot auth login or provide a supported GitHub token.'}`
+          error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`
         });
       }
-    } else if (providerConfig.provider === 'compatible') {
+    } else if (effectiveProvider === 'codex') {
+      try {
+        const models = await codexAuthService.models();
+        if (!models.some((model: { id?: string }) => (
+          model.id === (effectiveSetupConfig.CODEX_MODEL || effectiveSetupConfig.AI_MODEL)
+        ))) {
+          return res.status(400).json({
+            error: 'ChatGPT subscription connection failed. Sign in again and choose an available model.'
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          error: 'ChatGPT subscription connection failed. Complete device sign-in and retry.'
+        });
+      }
+    } else if (effectiveProvider === 'compatible') {
       const isValid = await setupService.validateCustomConfig(
-        providerConfig.compatibleBaseUrl,
-        providerConfig.compatibleApiKey,
-        providerConfig.selectedModel
+        effectiveSetupConfig.COMPATIBLE_BASE_URL || effectiveSetupConfig.CUSTOM_BASE_URL,
+        effectiveSetupConfig.COMPATIBLE_API_KEY || effectiveSetupConfig.CUSTOM_API_KEY,
+        effectiveSetupConfig.COMPATIBLE_MODEL || effectiveSetupConfig.CUSTOM_MODEL || effectiveSetupConfig.AI_MODEL
       );
       if (!isValid) {
         return res.status(400).json({
           error: 'OpenAI-compatible connection failed. Please check base URL, key, and model.'
         });
       }
-    } else if (providerConfig.provider === 'azure') {
+    } else if (effectiveProvider === 'azure') {
       const isValid = await setupService.validateAzureConfig(
-        azureApiKey,
-        azureEndpoint,
-        azureDeploymentName,
-        azureApiVersion
+        effectiveSetupConfig.AZURE_API_KEY,
+        effectiveSetupConfig.AZURE_ENDPOINT,
+        effectiveSetupConfig.AZURE_DEPLOYMENT_NAME,
+        effectiveSetupConfig.AZURE_API_VERSION
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4118,8 +4263,11 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
       processedCustomFields
     });
 
-    // Save configuration
-    await setupService.saveConfig(config);
+    // Persist validated settings first, but do not expose the installation as
+    // complete until an owner account exists. A crash anywhere before the
+    // final marker remains safely retryable through the serialized setup path.
+    config.TAGVICO_AI_INITIAL_SETUP = 'no';
+    await setupService.saveValidatedConfig(config);
     resetRuntimeServices();
     const tagProvisioning = await provisionControlledTags();
     onboardingService.writeOnboardingSnapshot(config);
@@ -4128,7 +4276,11 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     persistWriteMode(req.body, true);
 
     const hashedPassword = await bcrypt.hash(password, 15);
-    await documentModel.addUser(username, hashedPassword);
+    const ownerCreated = await documentModel.addUser(username, hashedPassword);
+    if (!ownerCreated) {
+      throw new Error('Could not create the owner account. Initial setup remains open for retry.');
+    }
+    await setupService.savePartialConfig({ TAGVICO_AI_INITIAL_SETUP: 'yes' });
 
     res.json({ 
       success: true,
@@ -4142,6 +4294,9 @@ router.post('/setup', express.json(), async (req: Req, res: Res) => {
     res.status(500).json({ 
       error: 'An error occurred: ' + errorMessage(error)
     });
+  } finally {
+    releaseSetupRequestLock?.();
+    setupPendingRequests -= 1;
   }
 });
 
@@ -4420,7 +4575,8 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
     if (providerConfig.provider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
         providerConfig.openrouterApiKey,
-        providerConfig.selectedModel
+        providerConfig.selectedModel,
+        injectedEnvironmentValue('OPENROUTER_BASE_URL') || providerConfig.openrouterBaseUrl || currentConfig.OPENROUTER_BASE_URL || undefined
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4428,16 +4584,20 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
         });
       }
     } else if (providerConfig.provider === 'openai' && providerConfig.openaiApiKey) {
-      const isValid = await setupService.validateOpenAIConfig(providerConfig.openaiApiKey);
+      const isValid = await setupService.validateOpenAIConfig(
+        providerConfig.openaiApiKey,
+        providerConfig.selectedModel || currentConfig.OPENAI_MODEL
+      );
       if (!isValid) {
         return res.status(400).json({
-          error: 'OpenAI API key is not valid. Please check the key.'
+          error: 'OpenAI connection failed. Please check the API key and selected model.'
         });
       }
     } else if (providerConfig.provider === 'ollama') {
       const isValid = await setupService.validateOllamaConfig(
         providerConfig.ollamaUrl || currentConfig.OLLAMA_API_URL,
-        providerConfig.selectedModel || currentConfig.OLLAMA_MODEL
+        providerConfig.selectedModel || currentConfig.OLLAMA_MODEL,
+        providerConfig.ollamaApiKey || currentConfig.OLLAMA_API_KEY
       );
       if (!isValid) {
         return res.status(400).json({
@@ -4468,9 +4628,24 @@ router.post('/settings', express.json(), async (req: Req, res: Res) => {
       }
     } else if (providerConfig.provider === 'copilot') {
       const status = await copilotService.healthcheck({ gitHubToken: providerConfig.copilotGitHubToken || currentConfig.COPILOT_GITHUB_TOKEN });
-      if (!status.ok) {
+      const selectedModel = providerConfig.selectedModel || currentConfig.COPILOT_MODEL;
+      if (!status.ok || !status.models.includes(selectedModel)) {
         return res.status(400).json({
-          error: `GitHub Copilot connection failed: ${status.error || 'sign in with copilot auth login or provide a supported GitHub token.'}`
+          error: `GitHub Copilot connection failed: ${status.error || 'the selected model is unavailable to this account.'}`
+        });
+      }
+    } else if (providerConfig.provider === 'codex') {
+      const selectedModel = providerConfig.selectedModel || currentConfig.CODEX_MODEL;
+      try {
+        const models = await codexAuthService.models();
+        if (!models.some((model: { id?: string }) => model.id === selectedModel)) {
+          return res.status(400).json({
+            error: 'ChatGPT subscription connection failed. Sign in again and choose an available model.'
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          error: 'ChatGPT subscription connection failed. Complete device sign-in and retry.'
         });
       }
     } else if (providerConfig.provider === 'compatible') {
@@ -4850,7 +5025,7 @@ router.get('/api/codex/models', allowDuringSetup, async (req: Req, res: Res) => 
   }
 });
 
-router.post('/api/codex/login', allowDuringSetup, express.json(), async (req: Req, res: Res) => {
+router.post('/api/codex/login', allowDuringSetup, codexLoginLimiter, express.json(), async (req: Req, res: Res) => {
   try { res.json(await codexAuthService.login(req.body?.type === 'chatgpt' ? 'chatgpt' : 'chatgptDeviceCode')); }
   catch (error) { res.status(502).json({ error: errorMessage(error) }); }
 });

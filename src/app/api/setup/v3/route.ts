@@ -1,25 +1,35 @@
 import { setupV3Schema } from '@root/contracts/provider';
-import { assertSameOrigin, apiError, readJsonBody } from '@/lib/server/auth';
+import { apiError, ApiError, readJsonBody } from '@/lib/server/auth';
+import { assertInitialSetupOpen } from '@/lib/server/initial-setup';
 
 const providerRegistryModule = require('@root/services/providerRegistry');
 const providerRegistry = providerRegistryModule.default || providerRegistryModule;
 
 export async function POST(request: Request) {
   try {
-    await assertSameOrigin(request);
-    if (process.env.ALLOW_REMOTE_SETUP !== 'yes') {
-      return Response.json({
-        error: 'Setup through the web application is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.'
-      }, { status: 403 });
-    }
+    await assertInitialSetupOpen(request);
     const input = setupV3Schema.parse(await readJsonBody(request));
     const definition = providerRegistry.getProviderDefinition(input.provider.instanceId);
     if (!definition) {
       return Response.json({ error: `Provider "${input.provider.instanceId}" is unavailable.` }, { status: 400 });
     }
+    const providerValues = {
+      ...Object.fromEntries(definition.fields.flatMap((field: { key: string; defaultValue?: string }) => (
+        field.defaultValue ? [[field.key, field.defaultValue]] : []
+      ))),
+      ...input.provider.values
+    };
+    for (const field of definition.fields.filter((candidate: { type: string }) => candidate.type === 'url')) {
+      const value = providerValues[field.key];
+      if (!value) continue;
+      const url = new URL(value);
+      if (url.username || url.password) {
+        throw new ApiError(400, `${field.key} must not contain embedded credentials.`);
+      }
+    }
     const providerEnvironment = providerRegistry.providerValuesToEnvironment(
       input.provider.instanceId,
-      input.provider.values
+      providerValues
     );
     const payload: Record<string, unknown> = {
       paperlessUrl: input.paperless.baseUrl.replace(/\/+$/, ''),
@@ -44,7 +54,8 @@ export async function POST(request: Request) {
       activateTitle: true,
       activateCustomFields: false,
       activateOwnerAssignment: true,
-      disableAutomaticProcessing: false,
+      disableAutomaticProcessing: true,
+      write_mode: 'review',
       aiReasoningEffort: 'auto'
     };
     const backend = process.env.TAGVICO_BACKEND_URL || 'http://127.0.0.1:3001';
@@ -56,7 +67,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(payload),
       cache: 'no-store',
       redirect: 'manual',
-      signal: AbortSignal.timeout(120_000)
+      signal: AbortSignal.timeout(240_000)
     });
     return new Response(await response.text(), {
       status: response.status,

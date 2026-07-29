@@ -15,3 +15,10 @@ CREATE TABLE IF NOT EXISTS heartbeats (
 CREATE INDEX IF NOT EXISTS idx_heartbeats_day ON heartbeats(day);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_month ON heartbeats(month, monthly_id);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_received ON heartbeats(received_at);
+
+CREATE TABLE IF NOT EXISTS landing_pageviews (
+  day TEXT PRIMARY KEY,
+  views INTEGER NOT NULL,
+  received_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_landing_pageviews_received ON landing_pageviews(received_at);

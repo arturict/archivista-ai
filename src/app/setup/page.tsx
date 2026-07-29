@@ -39,6 +39,7 @@ export default async function SetupPage() {
       type: field.type,
       required: field.required,
       placeholder: field.placeholder,
+      defaultValue: field.defaultValue,
       secret: field.secret
     })),
     configuration: {},

@@ -9,6 +9,44 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: '3.2.5',
+    date: '29 July 2026',
+    title: 'Safer first run and accountable answers',
+    summary: 'Live setup checks, safe defaults, source-linked answers and stronger recovery from the first connection through an approved action.',
+    status: 'released',
+    groups: [
+      {
+        title: 'First-run confidence',
+        items: [
+          'Guided setup verifies Paperless permissions, provider authentication, the live model catalog and the exact selected model before saving.',
+          'Built-in endpoints are prefilled, authenticated Ollama endpoints are supported, and local and cloud Ollama credentials remain separate.',
+          'Docker- and host-injected connection values are verified as the effective runtime configuration, while public catalog responses are bounded by bytes and model count.',
+          'Non-secret progress can resume in the same tab without storing Paperless tokens, passwords, provider keys or account credentials in the browser draft.',
+          'New installations start in Review first mode with scheduled scans paused and continue directly to Ask Tagvico after setup.',
+          'Scheduled scans can be enabled later in Settings without restarting the container.',
+          'Abandoned ChatGPT device sign-ins expire server-side, release their Codex process before the next attempt and rate-limit new login processes.',
+          'Paperless permission checks run concurrently and verified setup is persisted once so slow connections stay within one completion deadline.'
+        ]
+      },
+      {
+        title: 'Documents and Ask Tagvico',
+        items: [
+          'Safe source titles now link to the Paperless-backed document view so answers can be checked against the permitted original.',
+          'Authentication, rate-limit and transient Paperless failures stay retryable instead of appearing as missing documents.',
+          'Loading, empty, retry and narrow-screen states are clearer across setup, Documents, Ask Tagvico, Activity and Settings.'
+        ]
+      },
+      {
+        title: 'Privacy and reliability',
+        items: [
+          'Landing requests and opted-in installation reports are counted separately with first-party aggregate metrics, no cookies, no fingerprints and no permanent installation identifier.',
+          'Global Privacy Control and Do Not Track are respected, and small installation totals are suppressed.',
+          'Release acceptance exercises the complete path against an isolated real Paperless-ngx container with synthetic documents.'
+        ]
+      }
+    ]
+  },
+  {
     version: '3.2.0',
     date: '26 July 2026',
     title: 'Paper & Pine workspace',
@@ -149,4 +187,4 @@ export const changelogEntries: ChangelogEntry[] = [
   }
 ];
 
-export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.0')!;
+export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.5')!;

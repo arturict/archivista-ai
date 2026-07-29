@@ -15,6 +15,8 @@ type RuntimeAdapter =
   | 'copilot-sdk'
   | 'native-ollama';
 type DiscoveryKind = 'openai' | 'ollama' | 'codex' | 'copilot';
+const MAX_DISCOVERY_RESPONSE_BYTES = 1024 * 1024;
+const MAX_DISCOVERY_MODELS = 500;
 
 interface ProviderDefinition {
   id: ProviderInstanceId;
@@ -49,13 +51,20 @@ function secret(key: string, label: string, environmentKey: string, required = f
   };
 }
 
-function url(key: string, label: string, environmentKey: string, required = true): ProviderDefinition['fields'][number] {
+function url(
+  key: string,
+  label: string,
+  environmentKey: string,
+  required = true,
+  defaultValue?: string
+): ProviderDefinition['fields'][number] {
   return {
     key,
     label,
     environmentKey,
     type: 'url',
     required,
+    ...(defaultValue ? { defaultValue } : {}),
     secret: false
   };
 }
@@ -81,7 +90,10 @@ const definitions = [
     }).strict(),
     fields: [
       secret('apiKey', 'API key', 'OPENROUTER_API_KEY', true),
-      { ...url('baseUrl', 'Base URL', 'OPENROUTER_BASE_URL'), placeholder: 'https://openrouter.ai/api/v1' }
+      {
+        ...url('baseUrl', 'Base URL', 'OPENROUTER_BASE_URL', true, 'https://openrouter.ai/api/v1'),
+        placeholder: 'https://openrouter.ai/api/v1'
+      }
     ],
     suggestedModels: [
       { id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 Mini', description: 'Curated balanced suggestion; availability is verified against your live catalog.' },
@@ -107,7 +119,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Ollama URL', 'OLLAMA_API_URL'), placeholder: 'http://localhost:11434' },
+      {
+        ...url('baseUrl', 'Ollama URL', 'OLLAMA_API_URL', true, 'http://localhost:11434'),
+        placeholder: 'http://localhost:11434'
+      },
       secret('apiKey', 'API key (optional)', 'OLLAMA_API_KEY')
     ],
     suggestedModels: [],
@@ -131,7 +146,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Cloud URL', 'OLLAMA_CLOUD_API_URL'), placeholder: 'https://ollama.com' },
+      {
+        ...url('baseUrl', 'Cloud URL', 'OLLAMA_CLOUD_API_URL', true, 'https://ollama.com'),
+        placeholder: 'https://ollama.com'
+      },
       secret('apiKey', 'API key', 'OLLAMA_CLOUD_API_KEY', true)
     ],
     suggestedModels: [],
@@ -155,7 +173,10 @@ const definitions = [
       apiKey: optionalString
     }).strict(),
     fields: [
-      { ...url('baseUrl', 'Base URL', 'OPENCODE_BASE_URL'), placeholder: 'https://opencode.ai/zen/go/v1' },
+      {
+        ...url('baseUrl', 'Base URL', 'OPENCODE_BASE_URL', true, 'https://opencode.ai/zen/go/v1'),
+        placeholder: 'https://opencode.ai/zen/go/v1'
+      },
       secret('apiKey', 'API key', 'OPENCODE_API_KEY', true)
     ],
     suggestedModels: [],
@@ -299,6 +320,7 @@ function normalizeModels(
 ): ModelDescriptor[] {
   const unique = new Map<string, ModelDescriptor>();
   for (const model of models) {
+    if (unique.size >= MAX_DISCOVERY_MODELS) break;
     const id = String(model.id || '').trim();
     if (!id || unique.has(id)) continue;
     unique.set(id, {
@@ -334,6 +356,44 @@ function secretFor(definition: ProviderDefinition, env: Environment): string {
   return field ? environmentValue(env, field.environmentKey, field.legacyEnvironmentKeys) : '';
 }
 
+async function readBoundedResponse(
+  response: Response,
+  maximumBytes = MAX_DISCOVERY_RESPONSE_BYTES
+): Promise<string> {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
+    throw new Error(`Model discovery response exceeds the ${maximumBytes}-byte limit.`);
+  }
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maximumBytes) {
+        await reader.cancel();
+        throw new Error(`Model discovery response exceeds the ${maximumBytes}-byte limit.`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 async function fetchJson(
   url: string,
   headers: Record<string, string>,
@@ -347,10 +407,15 @@ async function fetchJson(
     cache: 'no-store'
   });
   if (!response.ok) {
-    const hint = await response.text().catch(() => '');
+    const hint = await readBoundedResponse(response, 4096).catch(() => '');
     throw new Error(`Model discovery returned HTTP ${response.status}${hint ? `: ${hint.slice(0, 180)}` : ''}`);
   }
-  return response.json();
+  const body = await readBoundedResponse(response);
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error('Model discovery returned invalid JSON.');
+  }
 }
 
 async function discoverOpenAIModels(definition: ProviderDefinition, env: Environment): Promise<ModelDescriptor[]> {
@@ -386,7 +451,7 @@ async function discoverOllamaModels(definition: ProviderDefinition, env: Environ
   const entries = payload && typeof payload === 'object' && Array.isArray((payload as { models?: unknown[] }).models)
     ? (payload as { models: unknown[] }).models
     : [];
-  const candidates = entries.map((entry) => {
+  const candidates = entries.slice(0, MAX_DISCOVERY_MODELS).map((entry) => {
     const candidate = entry && typeof entry === 'object' ? entry as Record<string, unknown> : {};
     const id = String(candidate.name || candidate.model || '');
     return { id, name: id, isDefault: false, options: [], capabilities: [] };

@@ -42,6 +42,20 @@ test('key-based providers expose write-only credentials and branded providers us
   assert.equal(definitions.find((candidate) => candidate.id === 'compatible').icon, null);
 });
 
+test('standard provider endpoints are safe prefilled defaults instead of required blank fields', () => {
+  const definitions = registry.getProviderDefinitions();
+  const defaults = Object.fromEntries(definitions.map((definition) => [
+    definition.id,
+    definition.fields.find((field) => field.key === 'baseUrl')?.defaultValue
+      || definition.fields.find((field) => field.key === 'url')?.defaultValue
+      || null
+  ]));
+  assert.equal(defaults.openrouter, 'https://openrouter.ai/api/v1');
+  assert.equal(defaults.ollama, 'http://localhost:11434');
+  assert.equal(defaults['ollama-cloud'], 'https://ollama.com');
+  assert.equal(defaults.opencode, 'https://opencode.ai/zen/go/v1');
+});
+
 test('unknown provider instances are preserved as unavailable instead of silently masquerading as a known provider', () => {
   assert.equal(registry.getProviderDefinition('future-private-runtime'), null);
 });
@@ -73,6 +87,59 @@ test('normalization keeps runtime ordering, defaults and unique model IDs', () =
     ['gpt-5.6-luna', true],
     ['gpt-5.6-terra', false]
   ]);
+});
+
+test('model discovery bounds response bytes and normalized catalog entries', async () => {
+  assert.equal(registry.normalizeModels(
+    Array.from({ length: 600 }, (_, index) => ({
+      id: `model-${index}`,
+      name: `Model ${index}`,
+      isDefault: false,
+      options: []
+    }))
+  ).length, 500);
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response('{}', {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(1024 * 1024 + 1)
+    }
+  });
+  try {
+    await assert.rejects(
+      () => registry.discoverOpenAIModels(
+        registry.getProviderDefinition('compatible'),
+        { COMPATIBLE_BASE_URL: 'http://provider.test/v1' }
+      ),
+      /response exceeds the 1048576-byte limit/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  global.fetch = async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(1024 * 1024));
+      controller.enqueue(new Uint8Array(1));
+      controller.close();
+    }
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+  try {
+    await assert.rejects(
+      () => registry.discoverOpenAIModels(
+        registry.getProviderDefinition('compatible'),
+        { COMPATIBLE_BASE_URL: 'http://provider.test/v1' }
+      ),
+      /response exceeds the 1048576-byte limit/
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
 });
 
 test('empty secret values retain the configured secret and provider fields map centrally', () => {

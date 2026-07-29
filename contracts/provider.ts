@@ -50,6 +50,7 @@ export const providerFieldDescriptorSchema = z.object({
   type: z.enum(['text', 'password', 'url']),
   required: z.boolean().default(false),
   placeholder: z.string().optional(),
+  defaultValue: z.string().optional(),
   secret: z.boolean().default(false)
 });
 
