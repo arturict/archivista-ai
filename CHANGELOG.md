@@ -10,6 +10,8 @@
   keep local and cloud Ollama credentials separate at validation and runtime.
 - Validate Docker- and host-injected connection values as the effective runtime
   configuration, even when a stale browser value is submitted.
+- Watch the scan configuration before first-run setup completes, so enabling a
+  schedule later in Settings takes effect without restarting the container.
 - Let non-secret setup progress resume in the same browser tab while keeping
   API tokens, passwords, provider keys, and account credentials out of the
   browser draft.

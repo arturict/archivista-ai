@@ -80,6 +80,7 @@ test('provider probe validates the selected model and supports catalog-less comp
   assert.match(setupService, /SETUP_TOOL_STANDARD_TOKEN_BUDGET = 64/);
   assert.match(setupService, /reasoning_effort: 'low'/);
   assert.match(setupService, /\{ forceCompletionTokens: true \}/);
+  assert.match(setupService, /\{ forceStandardTokens: true \}/);
   assert.match(setupService, /max_completion_tokens\|unsupported/);
   assert.match(setupService, /\/api\/chat/);
   assert.match(setupService, /message\?\.tool_calls/);
@@ -143,7 +144,10 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(read('services/paperlessService.ts'), /timeout: PAPERLESS_REQUEST_TIMEOUT_MS/);
   assert.match(setupRoutes, /const effectiveSetupConfig = setupService\.effectiveConfig\(buildConfigForSave\(req\.body\)\)/);
   assert.match(setupRoutes, /effectiveSetupConfig\.PAPERLESS_API_TOKEN/);
-  assert.match(setupRoutes, /effectiveSetupConfig\.OPENROUTER_API_KEY/);
+  assert.match(
+    setupRoutes,
+    /effectiveSetupConfig\.OPENROUTER_API_KEY \|\| effectiveSetupConfig\.OPENAI_API_KEY/
+  );
   assert.match(setupRoutes, /OPENROUTER_BASE_URL: injectedEnvironmentValue\('OPENROUTER_BASE_URL'\) \|\| providerPayload\.openrouterBaseUrl/);
   assert.match(setupService, /injectedEnvironmentValue\(name: string\)/);
   assert.match(setupService, /effectiveConfig\(config: SetupConfig\)/);
@@ -159,6 +163,17 @@ test('setup is serialized and remains retryable until the owner exists', () => {
   assert.match(runtimeConfig, /ollama:\s*\{\s*apiKey: process\.env\.OLLAMA_API_KEY \|\| ''/);
   assert.match(runtimeConfig, /ollamaCloud:\s*\{\s*apiKey: process\.env\.OLLAMA_CLOUD_API_KEY \|\| ''/);
   assert.doesNotMatch(runtimeConfig, /OLLAMA_CLOUD_API_KEY \|\| process\.env\.OLLAMA_API_KEY/);
+});
+
+test('first-run scan scheduling can be enabled later without restarting', () => {
+  const server = read('server.ts');
+  const registration = server.indexOf('scanScheduler.register(async () =>');
+  const setupCheck = server.indexOf('const isConfigured = await setupService.isConfigured()', registration);
+
+  assert.ok(registration >= 0);
+  assert.ok(setupCheck > registration);
+  assert.match(server, /if \(!await setupService\.isConfigured\(\)\) return/);
+  assert.match(server, /await scanDocuments\(\)/);
 });
 
 test('Copilot setup probes bound startup, auth, model discovery, and cleanup', () => {

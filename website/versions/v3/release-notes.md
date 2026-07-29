@@ -16,7 +16,8 @@ catalog entries, time, and concurrency.
 Non-secret setup progress can resume in the same tab after an interruption.
 Paperless tokens, passwords, provider keys, and account credentials are never
 stored in that browser draft. New installations start in Review first mode
-with scheduled scans paused, then continue directly to Ask Tagvico.
+with scheduled scans paused, then continue directly to Ask Tagvico. Enabling a
+schedule later in Settings takes effect without restarting the container.
 
 Ask Tagvico source titles now link to the permitted Paperless-backed document
 view. Authentication, rate-limit, and transient Paperless failures remain

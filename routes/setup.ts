@@ -4151,7 +4151,7 @@ router.post('/setup', setupLimiter, express.json(), async (req: Req, res: Res) =
 
     if (effectiveProvider === 'openrouter') {
       const isValid = await setupService.validateOpenRouterConfig(
-        effectiveSetupConfig.OPENROUTER_API_KEY,
+        effectiveSetupConfig.OPENROUTER_API_KEY || effectiveSetupConfig.OPENAI_API_KEY,
         effectiveSetupConfig.OPENROUTER_MODEL || effectiveSetupConfig.AI_MODEL,
         effectiveSetupConfig.OPENROUTER_BASE_URL || undefined
       );

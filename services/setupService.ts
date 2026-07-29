@@ -22,7 +22,14 @@ function isReasoningModel(model: string) {
   return /^(?:gpt-5|o\d)/i.test(unqualifiedModel);
 }
 
-function tokenLimitParam(model: string, forceCompletionTokens = false) {
+function tokenLimitParam(
+  model: string,
+  forceCompletionTokens = false,
+  forceStandardTokens = false
+) {
+  if (forceStandardTokens) {
+    return { max_tokens: SETUP_TOOL_STANDARD_TOKEN_BUDGET };
+  }
   return forceCompletionTokens || isReasoningModel(model)
     ? { max_completion_tokens: SETUP_TOOL_REASONING_TOKEN_BUDGET }
     : { max_tokens: SETUP_TOOL_STANDARD_TOKEN_BUDGET };
@@ -30,7 +37,11 @@ function tokenLimitParam(model: string, forceCompletionTokens = false) {
 
 function toolValidationRequest(
   model: string,
-  options: { forceCompletionTokens?: boolean; reasoningEffort?: boolean } = {}
+  options: {
+    forceCompletionTokens?: boolean;
+    forceStandardTokens?: boolean;
+    reasoningEffort?: boolean;
+  } = {}
 ) {
   const reasoningModel = isReasoningModel(model);
   return {
@@ -56,7 +67,7 @@ function toolValidationRequest(
       type: 'function' as const,
       function: { name: SETUP_TOOL_NAME }
     },
-    ...tokenLimitParam(model, options.forceCompletionTokens),
+    ...tokenLimitParam(model, options.forceCompletionTokens, options.forceStandardTokens),
     ...(reasoningModel && options.reasoningEffort ? { reasoning_effort: 'low' as const } : {})
   };
 }
@@ -266,7 +277,8 @@ class SetupService {
             parameters: {
               type: 'object',
               properties: { supported: { type: 'boolean' } },
-              required: ['supported']
+              required: ['supported'],
+              additionalProperties: false
             }
           }
         }],
@@ -310,7 +322,10 @@ class SetupService {
           if (!/max_completion_tokens|unsupported (?:parameter|argument)|unknown (?:parameter|argument)/i.test(errorMessage(error))) {
             throw error;
           }
-          response = await openai.chat.completions.create(toolValidationRequest(deploymentName));
+          response = await openai.chat.completions.create(toolValidationRequest(
+            deploymentName,
+            { forceStandardTokens: true }
+          ));
         }
         const now = new Date();
         const timestamp = now.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });

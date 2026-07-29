@@ -22,7 +22,8 @@ export const changelogEntries: ChangelogEntry[] = [
           'Built-in endpoints are prefilled, authenticated Ollama endpoints are supported, and local and cloud Ollama credentials remain separate.',
           'Docker- and host-injected connection values are verified as the effective runtime configuration, while public catalog responses are bounded by bytes and model count.',
           'Non-secret progress can resume in the same tab without storing Paperless tokens, passwords, provider keys or account credentials in the browser draft.',
-          'New installations start in Review first mode with scheduled scans paused and continue directly to Ask Tagvico after setup.'
+          'New installations start in Review first mode with scheduled scans paused and continue directly to Ask Tagvico after setup.',
+          'Scheduled scans can be enabled later in Settings without restarting the container.'
         ]
       },
       {
