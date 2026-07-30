@@ -1,6 +1,6 @@
 # Community launch kit
 
-These drafts match stable Tagvico v3.2.5. Check each community's current
+These drafts match stable Tagvico v3.2.6. Check each community's current
 self-promotion rules immediately before posting, publish one substantial post
 at a time, and stay available to answer replies. Do not cross-post identical
 copy.
@@ -40,14 +40,14 @@ with visible document sources, proposes structured metadata and follow-up
 actions, and keeps every document write behind an explicit approval card.
 Paperless remains the system of record.
 
-Stable v3.2.5 includes guided connection verification, source-backed answers,
+Stable v3.2.6 includes guided connection verification, source-backed answers,
 durable conversations and approvals, metadata restoration, recovery queues,
 and a responsive interface. New installations start in Review first mode with
 scheduled scans paused.
 
 **Deployment:** Tagvico is MIT licensed and distributed as a Docker image with
 a Compose example and versioned installation documentation. Pin the immutable
-v3.2.5 image, connect an existing Paperless-ngx instance, and choose local
+v3.2.6 image, connect an existing Paperless-ngx instance, and choose local
 Ollama or an explicitly configured hosted provider.
 
 Tagvico does not operate a document-processing cloud service, but a hosted
@@ -64,7 +64,7 @@ would trust after finding a document.
 
 ## r/Paperlessngx
 
-**Title:** Tagvico v3.2.5: a review-first action and research layer for Paperless-ngx
+**Title:** Tagvico v3.2.6: a review-first action and research layer for Paperless-ngx
 
 I maintain Tagvico, an independent self-hosted companion for Paperless-ngx.
 Paperless remains the document system of record. Tagvico adds source-backed
@@ -102,7 +102,7 @@ Paperless remains the system of record. Tagvico is TypeScript, Docker, SQLite,
 and MIT licensed. It supports local models and explicitly configured hosted
 providers instead of requiring a Tagvico-operated AI service.
 
-The current stable release is v3.2.5:
+The current stable release is v3.2.6:
 
 https://tagvico.arturf.ch/
 
@@ -138,7 +138,7 @@ document contents, names, and account identifiers.
 
 ## Visual asset checklist
 
-- Record 60 to 90 seconds on a representative v3.2.5 installation.
+- Record 60 to 90 seconds on a representative v3.2.6 installation.
 - Use synthetic documents throughout.
 - Show question, visible source, proposed action, approval, and Paperless result.
 - Inspect every final frame for credentials, endpoints, names, document content,

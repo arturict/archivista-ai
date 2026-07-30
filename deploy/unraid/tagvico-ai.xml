@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>Tagvico AI</Name>
-  <Repository>ghcr.io/arturict/tagvico-ai:2.0.0-alpha.1</Repository>
+  <Repository>ghcr.io/arturict/tagvico-ai:3.2.6</Repository>
   <Registry>https://github.com/arturict/tagvico-ai/pkgs/container/tagvico-ai</Registry>
   <Network>bridge</Network>
   <WebUI>http://[IP]:[PORT:3000]/setup</WebUI>
-  <Overview>Self-hosted, reviewable AI metadata filing for Paperless-ngx.</Overview>
+  <Overview>Private Action Center and approval-gated companion for Paperless-ngx.</Overview>
   <Category>Productivity: Tools:</Category>
   <Icon>https://raw.githubusercontent.com/arturict/tagvico-ai/main/public/tagvico-icon.png</Icon>
   <Config Name="Web UI" Target="3000" Default="8080" Mode="tcp" Description="Tagvico web interface" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
   <Config Name="Persistent data" Target="/app/data" Default="/mnt/user/appdata/tagvico-ai" Mode="rw" Description="Configuration, history, and local admin data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/tagvico-ai</Config>
-  <Config Name="Allow remote setup" Target="ALLOW_REMOTE_SETUP" Default="no" Mode="" Description="Set to yes temporarily to opt in to remote setup" Type="Variable" Display="always" Required="true" Mask="false">no</Config>
+  <Config Name="Allow remote setup" Target="ALLOW_REMOTE_SETUP" Default="no" Mode="" Description="Set to yes only while completing first setup from a trusted LAN browser, then return it to no" Type="Variable" Display="always" Required="true" Mask="false">no</Config>
   <Config Name="Anonymous analytics" Target="TAGVICO_TELEMETRY_ENABLED" Default="no" Mode="" Description="Optional aggregate installation heartbeat" Type="Variable" Display="always" Required="true" Mask="false">no</Config>
 </Container>

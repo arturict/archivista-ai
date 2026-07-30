@@ -43,7 +43,7 @@
         "name": "Tagvico",
         "applicationCategory": "DocumentManagementApplication",
         "operatingSystem": "Docker",
-        "softwareVersion": "3.2.5",
+        "softwareVersion": "3.2.6",
         "description": "Self-hosted document automation, archive research, action tracking, and controlled tag cleanup for Paperless-ngx.",
         "url": "https://tagvico.arturf.ch/",
         "downloadUrl": "https://github.com/arturict/tagvico-ai/releases",
@@ -2013,7 +2013,7 @@
 
     <div class="release-note" role="status">
       <div class="container">
-        <span class="release-pill">v3.2.5</span>
+        <span class="release-pill">v3.2.6</span>
         <span>Verified setup, source-linked answers, safer recovery, and privacy-first aggregate usage signals.</span>
       </div>
     </div>
@@ -2410,7 +2410,7 @@
             <h2>Start beside Paperless.</h2>
             <p>
               Pin the stable image, keep the data volume, and complete the guided setup in your browser.
-              Version 3.2.5 checks Paperless permissions and the runtime's live model catalog before saving.
+              Version 3.2.6 checks Paperless permissions and the runtime's live model catalog before saving.
               It uses the same persistent v3 data volume. Pin the immutable tag so upgrades stay deliberate and rollback remains simple.
             </p>
             <div class="actions" style="justify-content:flex-start">
@@ -2426,12 +2426,10 @@
               </div>
               <pre><code>services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.5
+    image: ghcr.io/arturict/tagvico-ai:3.2.6
     restart: unless-stopped
     ports:
-      - "8080:3000"
-    environment:
-      ALLOW_REMOTE_SETUP: "yes"
+      - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -2439,9 +2437,9 @@ volumes:
   tagvico_ai_data:</code></pre>
             </div>
             <p class="install-note">
-              Then open <strong>http://localhost:8080/setup</strong>. After setup succeeds, remove
-              <strong>ALLOW_REMOTE_SETUP</strong> and recreate the container. The named volume keeps your configuration.
-              Back up the data volume before every upgrade.
+              Then open <strong>http://localhost:8080/setup</strong> on the Docker host. For a trusted LAN browser,
+              explicitly bind to <strong>0.0.0.0</strong> and enable <strong>ALLOW_REMOTE_SETUP=yes</strong> only until
+              setup completes. Keep port 8080 behind the host firewall. Back up the data volume before every upgrade.
             </p>
           </div>
         </div>
@@ -2463,12 +2461,10 @@ volumes:
     <script>
       const composeSnippet = `services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.5
+    image: ghcr.io/arturict/tagvico-ai:3.2.6
     restart: unless-stopped
     ports:
-      - "8080:3000"
-    environment:
-      ALLOW_REMOTE_SETUP: "yes"
+      - "\${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
     volumes:
       - tagvico_ai_data:/app/data
 

@@ -9,6 +9,30 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: '3.2.6',
+    date: '30 July 2026',
+    title: 'Safer deployment and verified metrics',
+    summary: 'Local-first port bindings, explicit remote setup and a live privacy-preserving aggregate metrics receiver.',
+    status: 'released',
+    groups: [
+      {
+        title: 'Deployment safety',
+        items: [
+          'The bundled local Compose stack binds Paperless and Tagvico to loopback unless the operator explicitly selects LAN access.',
+          'Remote first-run setup defaults to off in Compose and Unraid and must be enabled only while creating the owner from a trusted LAN browser.',
+          'The Unraid template now pins the current stable v3 image instead of the obsolete v2 alpha.'
+        ]
+      },
+      {
+        title: 'Operational metrics',
+        items: [
+          'The documented aggregate telemetry receiver is deployed with D1 retention, bounded writes and small-count suppression.',
+          'Server-side monitoring can read the public summary without an Origin header while foreign browser origins remain rejected.'
+        ]
+      }
+    ]
+  },
+  {
     version: '3.2.5',
     date: '29 July 2026',
     title: 'Safer first run and accountable answers',
@@ -187,4 +211,4 @@ export const changelogEntries: ChangelogEntry[] = [
   }
 ];
 
-export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.5')!;
+export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.6')!;

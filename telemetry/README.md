@@ -35,12 +35,15 @@ retention, and regional settings before deploying.
    keep both rate-limiter bindings enabled.
 3. Store a long random `ADMIN_TOKEN` with `wrangler secret put ADMIN_TOKEN`.
 4. Set `PUBLIC_ORIGIN` to the exact landing-page origin.
-5. Deploy, attach `telemetry.tagvico.arturf.ch`, and disable request-log storage
-   where supported.
+5. Keep the custom-domain route in `wrangler.toml`, deploy, confirm Cloudflare
+   replaced any previous DNS record for `telemetry.tagvico.arturf.ch`, and
+   disable request-log storage where supported.
 6. Verify accepted and rate-limited `POST /v1/pageview` requests, then verify
    `POST /v1/heartbeat` and
-   `GET /v1/public-summary`. Query the private `GET /v1/summary` with the bearer
-   token. Never expose the raw D1 database publicly.
+   `GET /v1/public-summary` both with the website Origin header and without an
+   Origin header for server-side monitoring. Foreign browser origins remain
+   rejected. Query the private `GET /v1/summary` with the bearer token. Never
+   expose the raw D1 database publicly.
 
 The aggregate dashboard must label every result as opted-in installations.
 The public landing counter must use `credentials: "omit"` and

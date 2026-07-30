@@ -26,6 +26,11 @@ function websiteHeaders(request, env) {
   };
 }
 
+function publicReadHeaders(request, env) {
+  if (!request.headers.get('origin')) return {};
+  return websiteHeaders(request, env);
+}
+
 function publicCount(value) {
   const count = Number(value) || 0;
   return count >= 5
@@ -76,7 +81,7 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/public-summary') {
-      const headers = websiteHeaders(request, env);
+      const headers = publicReadHeaders(request, env);
       if (!headers) return json({ error: 'origin_not_allowed' }, 403);
       const [pageviews, activeInstallations] = await env.DB.batch([
         env.DB.prepare("SELECT COALESCE(SUM(views), 0) AS value FROM landing_pageviews WHERE day >= date('now', '-29 days')"),
