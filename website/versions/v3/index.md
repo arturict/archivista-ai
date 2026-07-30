@@ -10,7 +10,7 @@ hero:
     alt: Tagvico AI
   actions:
     - theme: brand
-      text: Install v3.2.5
+      text: Install v3.2.6
       link: /installation
     - theme: alt
       text: Explore features
@@ -49,7 +49,7 @@ older major-version guides available, while [Release notes](./release-notes)
 shows exactly what changed in v3.2.
 
 ::: tip Production defaults
-Pin the immutable `3.2.5` image, back up the data volume before upgrades, and start new installations in
+Pin the immutable `3.2.6` image, back up the data volume before upgrades, and start new installations in
 **Review first** mode. Companion writes are always approval-gated regardless
 of the metadata processing mode.
 :::

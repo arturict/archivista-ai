@@ -19,7 +19,7 @@ services:
     security_opt:
       - no-new-privileges=true
     ports:
-      - "8080:3000"
+      - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
     environment:
       TAGVICO_AI_PORT: "3000"
     volumes:
@@ -42,10 +42,11 @@ curl http://localhost:8080/health
 
 Open `http://localhost:8080/setup` after the health check succeeds.
 
-If the setup browser is on a different machine, temporarily add
-`ALLOW_REMOTE_SETUP: "yes"` to the service environment, recreate the
-container, and remove it immediately after the first setup completes. Do not
-leave it enabled for normal operation.
+If the setup browser is on a different machine, set
+`TAGVICO_AI_BIND_ADDRESS=0.0.0.0` and temporarily add
+`ALLOW_REMOTE_SETUP: "yes"` to the service environment. Keep port `8080`
+behind a trusted host firewall, recreate the container, and remove
+`ALLOW_REMOTE_SETUP` immediately after the first setup completes.
 
 ![Tagvico AI v2 sign-in screen captured from a clean VM 113 browser session](/screenshots/sign-in.png)
 
@@ -124,15 +125,16 @@ docker run -d \
   --restart unless-stopped \
   --cap-drop ALL \
   --security-opt no-new-privileges=true \
-  -p 8080:3000 \
+  -p 127.0.0.1:8080:3000 \
   -e TAGVICO_AI_PORT=3000 \
   -v tagvico_ai_data:/app/data \
   ghcr.io/arturict/tagvico-ai:2.0.1
 ```
 
 Setup is a one-time bootstrap; later configuration changes require signing in.
-For a remote browser, add `-e ALLOW_REMOTE_SETUP=yes` only until setup is
-finished, then recreate the container without it.
+For a remote browser, replace the published address with
+`-p 0.0.0.0:8080:3000` and add `-e ALLOW_REMOTE_SETUP=yes` only until setup is
+finished, then recreate the container without that environment value.
 
 ## Next steps
 

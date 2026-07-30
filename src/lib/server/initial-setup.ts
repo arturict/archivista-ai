@@ -2,13 +2,14 @@ import 'server-only';
 
 import { ApiError, assertSameOrigin } from './auth';
 import { getBackendConfigurationState } from './system';
+import { allowsInitialSetup } from '../../../services/proxyAddress';
 
 export async function assertInitialSetupOpen(request: Request) {
   await assertSameOrigin(request);
-  if (process.env.ALLOW_REMOTE_SETUP !== 'yes') {
+  if (!allowsInitialSetup()) {
     throw new ApiError(
       403,
-      'Setup through the web application is disabled. Set ALLOW_REMOTE_SETUP=yes temporarily to opt in.'
+      'Setup through the web application is disabled. Use a loopback-only bind or set ALLOW_REMOTE_SETUP=yes temporarily to opt in.'
     );
   }
   const configured = await getBackendConfigurationState();

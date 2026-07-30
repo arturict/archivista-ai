@@ -26,5 +26,9 @@ namespace_id = "1002"
   limit = 30
   period = 60
 
+[[routes]]
+pattern = "telemetry.tagvico.arturf.ch"
+custom_domain = true
+
 [triggers]
 crons = ["17 3 * * *"]

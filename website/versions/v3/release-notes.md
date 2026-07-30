@@ -1,5 +1,30 @@
 # Release notes
 
+## v3.2.6
+
+Released 30 July 2026.
+
+Tagvico 3.2.6 hardens the way a new installation is exposed before its owner
+exists. The bundled development Compose stack now binds Paperless and Tagvico
+to loopback and keeps remote setup disabled unless the operator explicitly
+chooses LAN access. The Unraid template uses the same locked-down setup default
+and now pins the current stable image instead of an obsolete v2 alpha.
+
+The installation guide separates local setup from trusted-LAN setup. A remote
+NAS install must deliberately bind Tagvico to the LAN and enable remote setup
+only until the owner account has been created. Normal signed-in LAN access can
+remain enabled without leaving the setup endpoint open.
+
+The first-party aggregate telemetry receiver is now deployed on its documented
+Cloudflare custom domain with D1 retention, rate limits, and public suppression
+for fewer than five opted-in installations. Server-side monitoring may read
+the public summary without an Origin header; foreign browser origins remain
+rejected.
+
+Upgrade by backing up `tagvico_ai_data`, pinning
+`ghcr.io/arturict/tagvico-ai:3.2.6`, and recreating only the Tagvico container.
+This patch does not change the data schema.
+
 ## v3.2.5
 
 Released 29 July 2026.

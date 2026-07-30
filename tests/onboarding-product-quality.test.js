@@ -256,7 +256,7 @@ test('subscription sign-in routes are limited to the open initial setup window',
     assert.doesNotMatch(route, /requireApiUser/);
   }
   assert.match(guard, /assertSameOrigin\(request\)/);
-  assert.match(guard, /ALLOW_REMOTE_SETUP !== 'yes'/);
+  assert.match(guard, /allowsInitialSetup\(\)/);
   assert.match(guard, /getBackendConfigurationState/);
   assert.match(guard, /Initial setup is complete/);
   assert.match(read('src/components/settings/setup-wizard.tsx'), /setState\(\(current\) => \(\{ \.\.\.current, modelId: '' \}\)\)/);
@@ -287,6 +287,30 @@ test('Docker release fixture keeps the mock document IDs used by acceptance', ()
   assert.match(acceptance, /paperlessDocumentIds: \[releaseDocumentId, releaseActionDocumentId\]/);
 });
 
+test('published deployment examples require explicit LAN exposure and remote setup', () => {
+  const compose = read('docker-compose.yml');
+  const readme = read('README.md');
+  const v3Install = read('website/versions/v3/installation.md');
+  const unraid = read('deploy/unraid/tagvico-ai.xml');
+  const dockerfile = read('Dockerfile');
+  assert.match(compose, /PAPERLESS_BIND_ADDRESS:-127\.0\.0\.1/);
+  assert.match(compose, /TAGVICO_AI_BIND_ADDRESS:-127\.0\.0\.1/);
+  assert.match(compose, /ALLOW_REMOTE_SETUP:-no/);
+  assert.match(compose, /TAGVICO_AI_BIND_ADDRESS: "\$\{TAGVICO_AI_BIND_ADDRESS:-127\.0\.0\.1\}"/);
+  assert.match(compose, /TAGVICO_TELEMETRY_ENDPOINT:-https:\/\/telemetry\.tagvico\.arturf\.ch\/v1\/heartbeat/);
+  for (const guide of [readme, v3Install]) {
+    assert.match(guide, /TAGVICO_AI_BIND_ADDRESS:-127\.0\.0\.1/);
+    assert.doesNotMatch(guide, /ALLOW_REMOTE_SETUP: "yes"/);
+    assert.match(guide, /TAGVICO_AI_BIND_ADDRESS=0\.0\.0\.0/);
+    assert.match(guide, /ALLOW_REMOTE_SETUP=yes/);
+    assert.match(guide, /telemetry\.tagvico\.arturf\.ch\/v1\/heartbeat/);
+  }
+  assert.match(unraid, /Target="ALLOW_REMOTE_SETUP" Default="no"/);
+  assert.match(unraid, />no<\/Config>/);
+  assert.match(unraid, /Target="TAGVICO_TELEMETRY_ENDPOINT"[\s\S]*\/v1\/heartbeat/);
+  assert.match(dockerfile, /TAGVICO_TELEMETRY_ENDPOINT=https:\/\/telemetry\.tagvico\.arturf\.ch\/v1\/heartbeat/);
+});
+
 test('manual Paperless option failures return a retryable response instead of rejecting the route', () => {
   const routes = read('routes/setup.ts');
   const handler = routes.slice(
@@ -312,8 +336,10 @@ test('global history rescan remains available when the active filter has no matc
 
 test('landing metrics stay separate, anonymous and privacy-signal aware', () => {
   const landing = read('docs/index.html');
-  assert.equal(landing.match(/ALLOW_REMOTE_SETUP: "yes"/g)?.length, 2);
-  assert.match(landing, /After setup succeeds, remove[\s\S]*ALLOW_REMOTE_SETUP[\s\S]*recreate the container/);
+  assert.doesNotMatch(landing, /ALLOW_REMOTE_SETUP: "yes"/);
+  assert.equal(landing.match(/TAGVICO_AI_BIND_ADDRESS:-127\.0\.0\.1/g)?.length, 4);
+  assert.equal(landing.match(/telemetry\.tagvico\.arturf\.ch\/v1\/heartbeat/g)?.length, 2);
+  assert.match(landing, /ALLOW_REMOTE_SETUP=yes[\s\S]*only until[\s\S]*setup completes/);
   assert.match(landing, /Requests, not unique people/);
   assert.match(landing, /credentials: "omit"/);
   assert.match(landing, /referrerPolicy: "no-referrer"/);
@@ -433,4 +459,16 @@ test('public metrics receiver rejects foreign origins, bounds writes and suppres
   assert.equal(body.opted_in_active_installations.publication, 'below_threshold');
   assert.equal(body.opted_in_active_installations.threshold, 5);
   assert.equal(summary.headers.get('access-control-allow-origin'), env.PUBLIC_ORIGIN);
+
+  const monitorSummary = await worker.fetch(
+    new Request('https://metrics.example/v1/public-summary'),
+    env
+  );
+  assert.equal(monitorSummary.status, 200);
+  assert.equal(monitorSummary.headers.get('access-control-allow-origin'), null);
+
+  const foreignSummary = await worker.fetch(new Request('https://metrics.example/v1/public-summary', {
+    headers: { origin: 'https://other.example' }
+  }), env);
+  assert.equal(foreignSummary.status, 403);
 });

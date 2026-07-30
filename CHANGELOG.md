@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.2.6 - 2026-07-30
+
+### Safer deployment defaults
+
+- Bind the bundled local Paperless and Tagvico ports to loopback unless the
+  operator explicitly selects a LAN bind address.
+- Keep remote first-run setup disabled by default in Compose and the Unraid
+  template. Remote NAS setup now requires a temporary, documented opt-in.
+- Update the Unraid template from the obsolete v2 alpha image to the immutable
+  v3.2.6 release.
+
+### Operational metrics
+
+- Deploy the privacy-preserving telemetry receiver on its Cloudflare custom
+  domain with the documented D1 schema, rate limits, retention job, and
+  small-count suppression.
+- Allow server-side monitoring to read the public aggregate summary without an
+  Origin header while continuing to reject foreign browser origins.
+
+### Upgrade note
+
+- Back up `tagvico_ai_data`, pull the pinned `3.2.6` image, and recreate only
+  the Tagvico container. This patch does not change the data schema.
+
 ## 3.2.5 - 2026-07-29
 
 ### Safer first run

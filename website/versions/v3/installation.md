@@ -11,7 +11,7 @@ Create a new directory and save this as `docker-compose.yml`:
 ```yaml
 services:
   tagvico-ai:
-    image: ghcr.io/arturict/tagvico-ai:3.2.5
+    image: ghcr.io/arturict/tagvico-ai:3.2.6
     container_name: tagvico-ai
     restart: unless-stopped
     cap_drop:
@@ -19,10 +19,11 @@ services:
     security_opt:
       - no-new-privileges=true
     ports:
-      - "8080:3000"
+      - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
     environment:
       TAGVICO_AI_PORT: "3000"
-      ALLOW_REMOTE_SETUP: "yes"
+      TAGVICO_AI_BIND_ADDRESS: "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}"
+      TAGVICO_TELEMETRY_ENDPOINT: "${TAGVICO_TELEMETRY_ENDPOINT:-https://telemetry.tagvico.arturf.ch/v1/heartbeat}"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -41,7 +42,24 @@ docker compose ps
 curl http://localhost:8080/health
 ```
 
-Open `http://localhost:8080/setup` after the health check succeeds.
+Open `http://localhost:8080/setup` on the Docker host after the health check
+succeeds.
+
+### Remote server or NAS
+
+The secure default publishes Tagvico only on loopback and accepts initial setup
+only from the same host. To finish setup from another device on a trusted LAN,
+set both values before starting the container:
+
+```dotenv
+TAGVICO_AI_BIND_ADDRESS=0.0.0.0
+ALLOW_REMOTE_SETUP=yes
+```
+
+Keep port `8080` behind the server firewall. After setup succeeds, remove
+`ALLOW_REMOTE_SETUP` and run `docker compose up -d` again. Keep the bind-address
+override only when the signed-in Tagvico application must remain reachable from
+the LAN.
 
 This sanitized capture shows the local admin sign-in presented after setup. It
 contains no credentials, private hostnames, document data, or account details.
@@ -66,10 +84,6 @@ the image you pinned even when the public website changes.
    Ask Tagvico can read immediately, while every proposed write still needs an
    explicit approval. Enable a schedule or Automatic metadata filing only
    after validating representative documents.
-
-After setup succeeds, remove `ALLOW_REMOTE_SETUP` from the Compose file and run
-`docker compose up -d` again. Compose recreates the container with remote setup
-locked down, while the named volume keeps your configuration and data.
 
 After saving the provider, inspect the detailed application health response.
 Unlike `/health`, this endpoint reports the configured model adapter's health
@@ -135,15 +149,18 @@ docker run -d \
   --restart unless-stopped \
   --cap-drop ALL \
   --security-opt no-new-privileges=true \
-  -p 8080:3000 \
+  -p 127.0.0.1:8080:3000 \
   -e TAGVICO_AI_PORT=3000 \
-  -e ALLOW_REMOTE_SETUP=yes \
+  -e TAGVICO_AI_BIND_ADDRESS=127.0.0.1 \
+  -e TAGVICO_TELEMETRY_ENDPOINT=https://telemetry.tagvico.arturf.ch/v1/heartbeat \
   -v tagvico_ai_data:/app/data \
-  ghcr.io/arturict/tagvico-ai:3.2.5
+  ghcr.io/arturict/tagvico-ai:3.2.6
 ```
 
-After setup, remove `ALLOW_REMOTE_SETUP=yes` unless you specifically need to
-repeat setup from another machine.
+For a remote browser, replace the published address with
+`-p 0.0.0.0:8080:3000`, set `-e TAGVICO_AI_BIND_ADDRESS=0.0.0.0`, and add
+`-e ALLOW_REMOTE_SETUP=yes` only until setup is complete. Remove the
+remote-setup environment value and recreate the container afterward.
 
 ## Next steps
 
