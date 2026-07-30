@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { isLocalProxyRequest } = require('../dist/services/proxyAddress');
+const { allowsInitialSetup, isLocalProxyRequest } = require('../dist/services/proxyAddress');
 const setupRoute = fs.readFileSync(
   path.join(__dirname, '..', 'src', 'app', 'api', 'setup', 'v3', 'route.ts'),
   'utf8'
@@ -30,9 +30,19 @@ test('only a direct backend loopback request without proxy metadata is local', (
   assert.equal(isLocalProxyRequest({ remoteAddress: '::1' }), true);
 });
 
-test('Next setup requires opt-in and never forwards client proxy identity headers', () => {
+test('initial setup allows an explicit loopback bind or remote opt-in', () => {
+  assert.equal(allowsInitialSetup({ TAGVICO_AI_BIND_ADDRESS: '127.0.0.1' }), true);
+  assert.equal(allowsInitialSetup({ TAGVICO_AI_BIND_ADDRESS: '::1' }), true);
+  assert.equal(allowsInitialSetup({ TAGVICO_AI_BIND_ADDRESS: '0.0.0.0' }), false);
+  assert.equal(allowsInitialSetup({
+    TAGVICO_AI_BIND_ADDRESS: '0.0.0.0',
+    ALLOW_REMOTE_SETUP: 'yes'
+  }), true);
+});
+
+test('Next setup uses deployment proof and never forwards client proxy identity headers', () => {
   assert.match(setupRoute, /assertInitialSetupOpen\(request\)/);
-  assert.match(initialSetupGuard, /process\.env\.ALLOW_REMOTE_SETUP !== 'yes'/);
+  assert.match(initialSetupGuard, /allowsInitialSetup\(\)/);
   const setupBoundary = `${setupRoute}\n${initialSetupGuard}`;
   assert.doesNotMatch(setupBoundary, /request\.headers\.get\('x-forwarded-for'\)/i);
   assert.doesNotMatch(setupBoundary, /request\.headers\.get\('x-forwarded-host'\)/i);

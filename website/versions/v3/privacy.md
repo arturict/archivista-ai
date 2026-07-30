@@ -90,8 +90,11 @@ expire after 62 days and only aggregate opted-in installation counts should be
 published.
 
 Set `TAGVICO_TELEMETRY_ENABLED=no` to enforce the default from the environment.
-Self-hosted distributors may override `TAGVICO_TELEMETRY_ENDPOINT`; it must use
-HTTPS. The complete policy and receiver source are available in
+Official images default to
+`https://telemetry.tagvico.arturf.ch/v1/heartbeat`, but send nothing unless you
+opt in. Self-hosted distributors may override `TAGVICO_TELEMETRY_ENDPOINT`; it
+must use HTTPS and point to a compatible heartbeat route. The complete policy
+and receiver source are available in
 [`PRIVACY_POLICY.md`](https://github.com/arturict/tagvico-ai/blob/main/PRIVACY_POLICY.md)
 and [`telemetry/`](https://github.com/arturict/tagvico-ai/tree/main/telemetry).
 

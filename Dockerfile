@@ -85,7 +85,8 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD port="${TAGVICO_AI_PORT:-${ARCHIVISTA_AI_PORT:-3000}}"; curl -f "http://localhost:${port}/health" || exit 1
 
 # Set production environment
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    TAGVICO_TELEMETRY_ENDPOINT=https://telemetry.tagvico.arturf.ch/v1/heartbeat
 
 # Start the Node.js service
 CMD ["./start-services.sh"]

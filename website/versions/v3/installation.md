@@ -22,6 +22,8 @@ services:
       - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
     environment:
       TAGVICO_AI_PORT: "3000"
+      TAGVICO_AI_BIND_ADDRESS: "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}"
+      TAGVICO_TELEMETRY_ENDPOINT: "${TAGVICO_TELEMETRY_ENDPOINT:-https://telemetry.tagvico.arturf.ch/v1/heartbeat}"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -149,13 +151,16 @@ docker run -d \
   --security-opt no-new-privileges=true \
   -p 127.0.0.1:8080:3000 \
   -e TAGVICO_AI_PORT=3000 \
+  -e TAGVICO_AI_BIND_ADDRESS=127.0.0.1 \
+  -e TAGVICO_TELEMETRY_ENDPOINT=https://telemetry.tagvico.arturf.ch/v1/heartbeat \
   -v tagvico_ai_data:/app/data \
   ghcr.io/arturict/tagvico-ai:3.2.6
 ```
 
 For a remote browser, replace the published address with
-`-p 0.0.0.0:8080:3000` and add `-e ALLOW_REMOTE_SETUP=yes` only until setup is
-complete. Remove that environment value and recreate the container afterward.
+`-p 0.0.0.0:8080:3000`, set `-e TAGVICO_AI_BIND_ADDRESS=0.0.0.0`, and add
+`-e ALLOW_REMOTE_SETUP=yes` only until setup is complete. Remove the
+remote-setup environment value and recreate the container afterward.
 
 ## Next steps
 

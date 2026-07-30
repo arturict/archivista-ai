@@ -2430,6 +2430,9 @@
     restart: unless-stopped
     ports:
       - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
+    environment:
+      TAGVICO_AI_BIND_ADDRESS: "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}"
+      TAGVICO_TELEMETRY_ENDPOINT: "${TAGVICO_TELEMETRY_ENDPOINT:-https://telemetry.tagvico.arturf.ch/v1/heartbeat}"
     volumes:
       - tagvico_ai_data:/app/data
 
@@ -2465,6 +2468,9 @@ volumes:
     restart: unless-stopped
     ports:
       - "\${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:8080:3000"
+    environment:
+      TAGVICO_AI_BIND_ADDRESS: "\${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}"
+      TAGVICO_TELEMETRY_ENDPOINT: "\${TAGVICO_TELEMETRY_ENDPOINT:-https://telemetry.tagvico.arturf.ch/v1/heartbeat}"
     volumes:
       - tagvico_ai_data:/app/data
 

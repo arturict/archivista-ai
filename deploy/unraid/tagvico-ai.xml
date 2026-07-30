@@ -12,4 +12,5 @@
   <Config Name="Persistent data" Target="/app/data" Default="/mnt/user/appdata/tagvico-ai" Mode="rw" Description="Configuration, history, and local admin data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/tagvico-ai</Config>
   <Config Name="Allow remote setup" Target="ALLOW_REMOTE_SETUP" Default="no" Mode="" Description="Set to yes only while completing first setup from a trusted LAN browser, then return it to no" Type="Variable" Display="always" Required="true" Mask="false">no</Config>
   <Config Name="Anonymous analytics" Target="TAGVICO_TELEMETRY_ENABLED" Default="no" Mode="" Description="Optional aggregate installation heartbeat" Type="Variable" Display="always" Required="true" Mask="false">no</Config>
+  <Config Name="Analytics endpoint" Target="TAGVICO_TELEMETRY_ENDPOINT" Default="https://telemetry.tagvico.arturf.ch/v1/heartbeat" Mode="" Description="Official aggregate receiver; distributors may override with a valid HTTPS heartbeat endpoint" Type="Variable" Display="advanced" Required="true" Mask="false">https://telemetry.tagvico.arturf.ch/v1/heartbeat</Config>
 </Container>
