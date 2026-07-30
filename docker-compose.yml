@@ -37,7 +37,7 @@ services:
       paperless-broker:
         condition: service_healthy
     ports:
-      - "${PAPERLESS_HOST_PORT:-8000}:8000"
+      - "${PAPERLESS_BIND_ADDRESS:-127.0.0.1}:${PAPERLESS_HOST_PORT:-8000}:8000"
     environment:
       PAPERLESS_REDIS: redis://paperless-broker:6379
       PAPERLESS_DBHOST: paperless-db
@@ -83,7 +83,7 @@ services:
       TAGVICO_AI_PORT: 3000
       PAPERLESS_API_URL: http://paperless-ngx:8000/api
       CODEX_HOME: /app/data/codex
-      ALLOW_REMOTE_SETUP: "yes"
+      ALLOW_REMOTE_SETUP: "${ALLOW_REMOTE_SETUP:-no}"
       TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-no}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_USERS_JSON: ${TELEGRAM_USERS_JSON:-[]}
@@ -95,7 +95,7 @@ services:
       # Explicit opt-in: this bypasses Tagvico's web review queue for bot uploads.
       TELEGRAM_UPLOAD_AUTOMATIC_METADATA: ${TELEGRAM_UPLOAD_AUTOMATIC_METADATA:-no}
     ports:
-      - "${TAGVICO_AI_HOST_PORT:-${ARCHIVISTA_AI_HOST_PORT:-8080}}:3000"
+      - "${TAGVICO_AI_BIND_ADDRESS:-127.0.0.1}:${TAGVICO_AI_HOST_PORT:-${ARCHIVISTA_AI_HOST_PORT:-8080}}:3000"
     volumes:
       - tagvico_ai_data:/app/data
 
