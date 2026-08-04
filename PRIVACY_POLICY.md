@@ -39,12 +39,14 @@ or end-to-end encrypted transport.
 
 An operator may enable a Discord bot and allowlist Discord user IDs (numeric
 snowflakes) with separate Paperless API tokens. This configuration remains on
-the installation and is not sent to the Tagvico project. Unknown users, bots,
-webhooks, and other channels are silently ignored.
+the installation and is not sent to the Tagvico project. Messages from unknown
+users, bots, webhooks, and other channels are silently ignored. Unauthorized
+slash commands receive only a private unavailable response.
 
 In direct messages, all content from allowlisted users is processed. In the
 optional home channel, only native slash commands, bot @-mentions, or replies
-to the bot trigger processing; unaddressed messages are ignored. The bot does
+to the bot that keep the bot mention enabled trigger processing; unaddressed
+messages are ignored. The bot does
 not request Discord's privileged Message Content intent.
 
 Conversation history is bounded, isolated by Discord user and channel,

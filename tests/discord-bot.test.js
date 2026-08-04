@@ -15,7 +15,8 @@ const path = require('node:path');
 
 const discordBot = require('../dist/services/discordBotService');
 const config = require('../dist/config/config');
-const { parseJsonObject, extractDocumentIds, cleanAnswerCitations, chunkDiscordText, chunkTelegramText } =
+const { parseJsonObject, extractDocumentIds, cleanAnswerCitations, chunkDiscordText, chunkTelegramText,
+  buildActionApprovalPayload } =
   require('../dist/services/companionBotInternals');
 
 // ============================================================
@@ -345,7 +346,7 @@ test('Discord bot silently ignores messages from unknown users', async () => {
   assert.equal(processed.length, 0, 'should not process unknown user');
 });
 
-test('home-channel replies are accepted only when the referenced author is the bot', async () => {
+test('home-channel replies require the bot mention and a bot-authored reference', async () => {
   const service = new discordBot.DiscordBotService();
   service.client = { user: { id: '333333333333333333' } };
   const base = {
@@ -355,15 +356,32 @@ test('home-channel replies are accepted only when the referenced author is the b
   assert.equal(await service.isBotAddressed({
     ...base,
     fetchReference: async () => ({ author: { id: '333333333333333333' } }),
+  }), false);
+  assert.equal(await service.isBotAddressed({
+    ...base,
+    mentions: { has: () => true },
+    fetchReference: async () => ({ author: { id: '333333333333333333' } }),
   }), true);
   assert.equal(await service.isBotAddressed({
     ...base,
+    mentions: { has: () => true },
     fetchReference: async () => ({ author: { id: '444444444444444444' } }),
   }), false);
   assert.equal(await service.isBotAddressed({
     ...base,
     fetchReference: async () => { throw new Error('deleted'); },
   }), false);
+});
+
+test('failed uploads return a generic requester-facing error', async () => {
+  const service = new discordBot.DiscordBotService();
+  const messages = [];
+  service.handleUpload = async () => { throw new Error('secret provider detail'); };
+  service.sendText = async (_channel, text) => messages.push(text);
+  await service.handleUploadSafely({ channel: {} }, {}, false);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /could not be completed/i);
+  assert.doesNotMatch(messages[0], /secret provider detail/i);
 });
 
 test('multiple DM attachments are rejected before upload', async () => {
@@ -406,6 +424,62 @@ test('slash clear removes only the current user-channel history', async () => {
   assert.equal(service.histories.has(`${userId}:dm-one`), false);
   assert.equal(service.histories.has(`${userId}:dm-two`), true);
   assert.match(reply.content, /cleared/i);
+});
+
+test('unauthorized slash commands receive a controlled ephemeral response', async () => {
+  const service = new discordBot.DiscordBotService();
+  service.users = new Map();
+  let reply;
+  await service.handleSlashCommand({
+    user: { id: '999999999999999999' }, channel: { type: 1 }, channelId: 'dm',
+    commandName: 'start', reply: async (value) => { reply = value; },
+  });
+  assert.equal(reply.ephemeral, true);
+  assert.match(reply.content, /not available/i);
+});
+
+test('long slash action lists are split into follow-up messages', async () => {
+  const service = new discordBot.DiscordBotService();
+  const userId = '111111111111111111';
+  service.users = new Map([[userId, {
+    discordId: userId, paperlessToken: 'tok', paperlessUrl: 'http://paperless/api',
+    householdId: 'household', memberId: 'member',
+  }]]);
+  const actionCenter = require('../dist/models/actionCenter');
+  const originalListCases = actionCenter.listCases;
+  actionCenter.listCases = () => Array.from({ length: 12 }, (_, index) => ({
+    title: `${index} ${'x'.repeat(235)}`, status: 'open', dueAt: null,
+  }));
+  const edits = [];
+  const follows = [];
+  try {
+    await service.handleSlashCommand({
+      user: { id: userId }, channel: { type: 1 }, channelId: 'dm', commandName: 'actions',
+      deferReply: async () => {},
+      editReply: async (value) => edits.push(value),
+      followUp: async (value) => follows.push(value),
+    });
+  } finally {
+    actionCenter.listCases = originalListCases;
+  }
+  assert.equal(edits.length, 1);
+  assert.ok(follows.length > 0);
+  assert.ok([edits[0], ...follows].every((message) => message.content.length <= 1900));
+});
+
+test('Discord sends suppress all parsed mentions', async () => {
+  const service = new discordBot.DiscordBotService();
+  const sent = [];
+  await service.sendText({ send: async (value) => sent.push(value) }, '@everyone <@123>');
+  assert.deepEqual(sent[0].allowedMentions, { parse: [], repliedUser: false });
+});
+
+test('action approval titles are clamped to the Action Center limit', () => {
+  const payload = buildActionApprovalPayload(
+    { actionTitle: 'x'.repeat(300) },
+    { id: 42, title: 'fallback' }
+  );
+  assert.equal(payload.title.length, 240);
 });
 
 // ============================================================

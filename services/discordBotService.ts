@@ -9,7 +9,8 @@
  * Channel routing:
  *   - Allowlisted DMs: always processed (commands, questions, uploads).
  *   - Optional DISCORD_HOME_CHANNEL_ID: slash commands, bot mentions, and
- *     replies to the bot are processed.  Unaddressed messages are ignored so
+ *     replies to the bot that keep the mention enabled are processed.
+ *     Unaddressed messages are ignored so
  *     no privileged Message Content intent is required.
  *   - All other channels: silently ignored.
  *
@@ -35,6 +36,7 @@ import {
   DMChannel,
   ChannelType,
   Partials,
+  MessageMentionOptions,
 } from 'discord.js';
 import axios from 'axios';
 import {
@@ -105,6 +107,7 @@ function cleanDiscordMention(value: string): string {
 // Maximum 10 MiB default (hard maximum also 10 MiB per spec)
 const DEFAULT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const HARD_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const NO_MENTIONS: MessageMentionOptions = { parse: [], repliedUser: false };
 
 // ---------------------------------------------------------------------------
 // Allowlist parser
@@ -215,6 +218,7 @@ class DiscordBotService {
         GatewayIntentBits.DirectMessages,
       ],
       partials: [Partials.Channel],
+      allowedMentions: NO_MENTIONS,
     });
 
     this.client.on(Events.ClientReady, async (ready) => {
@@ -342,8 +346,9 @@ class DiscordBotService {
   /** Returns true when the bot was @mentioned or the message is a reply to a bot message. */
   private async isBotAddressed(message: Message): Promise<boolean> {
     if (!this.client?.user) return false;
-    if (message.mentions.has(this.client.user.id)) return true;
+    const mentionsBot = message.mentions.has(this.client.user.id);
     if (message.reference?.messageId) {
+      if (!mentionsBot) return false;
       try {
         const referenced = await message.fetchReference();
         return referenced.author.id === this.client.user.id;
@@ -351,13 +356,31 @@ class DiscordBotService {
         return false;
       }
     }
-    return false;
+    return mentionsBot;
+  }
+
+  private async handleUploadSafely(
+    message: Message,
+    user: DiscordUserConfig,
+    inHomeChannel: boolean
+  ): Promise<void> {
+    try {
+      await this.handleUpload(message, user, inHomeChannel);
+    } catch (error) {
+      console.warn(`[Discord] Upload failed: ${errorMessage(error)}`);
+      await this.sendText(
+        message.channel,
+        'The upload could not be completed. Please try again or upload the file directly in Paperless.'
+      ).catch((sendError) =>
+        console.warn(`[Discord] Upload failure response could not be sent: ${errorMessage(sendError)}`)
+      );
+    }
   }
 
   private async handleDmMessage(message: Message, user: DiscordUserConfig): Promise<void> {
     // Attachments: exactly one file upload
     if (message.attachments.size === 1 && message.attachments.size > 0) {
-      return this.handleUpload(message, user, false);
+      return this.handleUploadSafely(message, user, false);
     }
     if (message.attachments.size > 1) {
       await this.sendText(message.channel, 'Please send exactly one file per upload.');
@@ -377,7 +400,7 @@ class DiscordBotService {
     // Attachments in home channel → ephemeral download not applicable here,
     // but we can upload documents
     if (message.attachments.size === 1) {
-      return this.handleUpload(message, user, true);
+      return this.handleUploadSafely(message, user, true);
     }
     if (message.attachments.size > 1) {
       await this.sendText(message.channel, 'Please send exactly one file per upload.');
@@ -418,6 +441,11 @@ class DiscordBotService {
 
     // Only process allowlisted users in DMs or the home channel
     if (!user || (!inDm && !inHome)) {
+      await interaction.reply({
+        content: 'This command is not available for this user or channel.',
+        ephemeral: true,
+        allowedMentions: NO_MENTIONS,
+      });
       return;
     }
 
@@ -473,7 +501,15 @@ class DiscordBotService {
                 )
                 .join('\n')
             : 'No active household actions.';
-          await interaction.editReply({ content: text });
+          const chunks = chunkDiscordText(text);
+          await interaction.editReply({ content: chunks[0], allowedMentions: NO_MENTIONS });
+          for (const chunk of chunks.slice(1)) {
+            await interaction.followUp({
+              content: chunk,
+              ephemeral,
+              allowedMentions: NO_MENTIONS,
+            });
+          }
         } catch (error) {
           await interaction.editReply({ content: `Could not load actions: ${errorMessage(error)}` });
         }
@@ -908,7 +944,10 @@ class DiscordBotService {
   ): Promise<void> {
     const chunks = chunkDiscordText(text);
     for (const chunk of chunks) {
-      await (channel as TextChannel | DMChannel).send({ content: chunk });
+      await (channel as TextChannel | DMChannel).send({
+        content: chunk,
+        allowedMentions: NO_MENTIONS,
+      });
     }
   }
 
@@ -946,6 +985,7 @@ class DiscordBotService {
 
       await (channel as TextChannel | DMChannel).send({
         content: chunks[i],
+        allowedMentions: NO_MENTIONS,
         ...(components.length ? { components } : {}),
       });
     }
@@ -971,6 +1011,7 @@ class DiscordBotService {
     await (channel as TextChannel | DMChannel).send({
       content: `Proposed action: **${title}**\n\nNothing changes until you approve.`,
       components: [row],
+      allowedMentions: NO_MENTIONS,
     });
   }
 }

@@ -68,9 +68,12 @@ step on infrastructure you control, but does not change the Discord boundary.
 
 Only explicitly allowlisted Discord snowflake IDs are processed. In direct
 messages, all allowlisted-user content is handled. In the optional home channel,
-only slash commands, bot @-mentions, or replies to the bot are processed;
+only slash commands, bot @-mentions, or replies to the bot that keep the bot
+mention enabled are processed;
 unaddressed messages are ignored so no privileged Message Content intent is
-required. Bots, webhooks, unknown users, and other channels receive no response.
+required. Messages from bots, webhooks, unknown users, and other channels
+receive no response. Unauthorized slash commands receive a private unavailable
+response.
 
 Each allowlisted Discord ID has a separate Paperless API token. Paperless
 therefore remains responsible for document visibility and mutation permissions.

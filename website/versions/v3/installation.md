@@ -172,9 +172,10 @@ environment:
 ```
 
 In direct messages, all allowlisted-user content is processed. In the optional
-home channel, only slash commands, bot @-mentions, and replies to the bot are
-processed; unaddressed messages are ignored. Unknown users, bots, webhooks, and
-other channels receive no response.
+home channel, only slash commands, bot @-mentions, and replies to the bot that
+keep the bot mention enabled are processed; unaddressed messages are ignored.
+Messages from unknown users, bots, webhooks, and other channels receive no
+response. Unauthorized slash commands receive a private unavailable response.
 
 Optional tuning variables: `DISCORD_UPLOAD_TIMEOUT_SECONDS` (default `180`),
 `DISCORD_MAX_DOCUMENTS` (default `8`), `DISCORD_HISTORY_TURNS` (default `6`),

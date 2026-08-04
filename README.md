@@ -248,7 +248,8 @@ DISCORD_USERS_JSON=[{"discordId":"123456789012345678","paperlessToken":"token-fo
 Unknown users, bots, webhooks, and other channels are silently ignored. In DMs,
 all text, slash commands, and attachments from allowlisted users are processed.
 In the optional home channel (`DISCORD_HOME_CHANNEL_ID`), only native slash
-commands, bot @-mentions, or replies to the bot are processed; unaddressed
+commands, bot @-mentions, or replies to the bot that keep the bot mention
+enabled are processed; unaddressed
 messages are ignored so no privileged Message Content intent is needed.
 
 To copy IDs, enable **User Settings → Advanced → Developer Mode** in Discord,

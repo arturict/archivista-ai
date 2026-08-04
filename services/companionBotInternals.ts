@@ -258,9 +258,12 @@ export function buildActionApprovalPayload(
   plan: Record<string, unknown>,
   document: PaperlessDocument
 ): Record<string, unknown> {
+  const title = (
+    safeText(plan.actionTitle) || `Follow up: ${safeText(document.title)}`
+  ).slice(0, 240);
   return {
     paperlessDocumentId: document.id,
-    title: safeText(plan.actionTitle) || `Follow up: ${safeText(document.title)}`,
+    title,
     dueAt: /^\d{4}-\d{2}-\d{2}$/.test(safeText(plan.dueAt)) ? safeText(plan.dueAt) : null,
     priority: 'normal',
     steps: [],

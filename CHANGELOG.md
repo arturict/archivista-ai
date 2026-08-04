@@ -14,7 +14,8 @@
   token, so Paperless remains the permission authority.
 - DM channel: all allowlisted-user messages are processed.
 - Optional home channel (`DISCORD_HOME_CHANNEL_ID`): only native slash
-  commands, bot @-mentions, or replies to the bot are processed; unaddressed
+  commands, bot @-mentions, or replies to the bot that keep the mention enabled
+  are processed; unaddressed
   messages are ignored so no privileged Message Content intent is required.
 - Bots, webhooks, unknown users, and other channels are silently ignored.
 - Conversation history is isolated by Discord user and channel, bounded by

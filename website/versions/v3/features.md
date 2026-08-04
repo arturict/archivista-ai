@@ -224,7 +224,7 @@ token; unknown users, bots, webhooks, and other channels are silently ignored.
 
 In direct messages all content is processed. In the optional home channel
 (`DISCORD_HOME_CHANNEL_ID`), only native slash commands, bot @-mentions, or
-replies to the bot are processed. Unaddressed messages are ignored so no
+replies to the bot that keep the bot mention enabled are processed. Unaddressed messages are ignored so no
 privileged Message Content intent is required.
 
 Document download and approval buttons are bound to the originating Discord
