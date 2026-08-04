@@ -41,6 +41,14 @@ test('Discord allowlist accepts valid snowflakes and rejects non-snowflakes', ()
   assert.ok(users.has('12345678901234567890'), 'should accept 20-digit snowflake');
 });
 
+test('Discord allowlist rejects numeric snowflakes before precision can be lost', () => {
+  const users = discordBot.parseDiscordUsers(
+    '[{"discordId":123456789012345678,"paperlessToken":"numeric-token"}]',
+    'http://paperless:8000/api'
+  );
+  assert.equal(users.size, 0);
+});
+
 test('Discord allowlist fills missing paperlessUrl from default', () => {
   const users = discordBot.parseDiscordUsers(
     JSON.stringify([{ discordId: '100000000000000001', paperlessToken: 'tok' }]),
@@ -346,7 +354,7 @@ test('Discord bot silently ignores messages from unknown users', async () => {
   assert.equal(processed.length, 0, 'should not process unknown user');
 });
 
-test('home-channel replies require the bot mention and a bot-authored reference', async () => {
+test('home-channel routing accepts explicit mentions regardless of reply target', async () => {
   const service = new discordBot.DiscordBotService();
   service.client = { user: { id: '333333333333333333' } };
   const base = {
@@ -366,11 +374,23 @@ test('home-channel replies require the bot mention and a bot-authored reference'
     ...base,
     mentions: { has: () => true },
     fetchReference: async () => ({ author: { id: '444444444444444444' } }),
-  }), false);
+  }), true);
   assert.equal(await service.isBotAddressed({
     ...base,
     fetchReference: async () => { throw new Error('deleted'); },
   }), false);
+});
+
+test('home-channel text commands are routed after stripping the bot mention', async () => {
+  const service = new discordBot.DiscordBotService();
+  let command;
+  service.handleTextCommand = async (text) => { command = text; };
+  service.handleQuestion = async () => { throw new Error('must not route as a question'); };
+  await service.handleHomeChannelMessage({
+    attachments: { size: 0 },
+    content: '<@333333333333333333> /clear',
+  }, {});
+  assert.equal(command, '/clear');
 });
 
 test('failed uploads return a generic requester-facing error', async () => {

@@ -128,7 +128,9 @@ export function parseDiscordUsers(
   for (const raw of entries) {
     if (!raw || typeof raw !== 'object') continue;
     const item = raw as Record<string, unknown>;
-    const discordId = safeText(item.discordId ?? item.discord_id ?? item.id);
+    const rawDiscordId = item.discordId ?? item.discord_id ?? item.id;
+    if (typeof rawDiscordId !== 'string') continue;
+    const discordId = safeText(rawDiscordId);
     if (!SNOWFLAKE_RE.test(discordId)) continue;
     const paperlessToken = safeText(item.paperlessToken ?? item.paperless_token ?? item.token);
     if (!paperlessToken) continue;
@@ -343,20 +345,10 @@ class DiscordBotService {
     // All other channels: silently ignore
   }
 
-  /** Returns true when the bot was @mentioned or the message is a reply to a bot message. */
+  /** Returns true when the bot was explicitly @mentioned. */
   private async isBotAddressed(message: Message): Promise<boolean> {
     if (!this.client?.user) return false;
-    const mentionsBot = message.mentions.has(this.client.user.id);
-    if (message.reference?.messageId) {
-      if (!mentionsBot) return false;
-      try {
-        const referenced = await message.fetchReference();
-        return referenced.author.id === this.client.user.id;
-      } catch {
-        return false;
-      }
-    }
-    return mentionsBot;
+    return message.mentions.has(this.client.user.id);
   }
 
   private async handleUploadSafely(
@@ -406,7 +398,7 @@ class DiscordBotService {
       await this.sendText(message.channel, 'Please send exactly one file per upload.');
       return;
     }
-    const text = safeText(message.content);
+    const text = cleanDiscordMention(message.content);
     if (!text) return;
     if (text.startsWith('/')) {
       await this.handleTextCommand(text, message, user, true);
