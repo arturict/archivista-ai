@@ -35,6 +35,9 @@ features:
   - icon: 💬
     title: Optional Telegram access
     details: Give allowlisted family members cited search, uploads, action lists, and approve/reject controls through their own Paperless tokens.
+  - icon: 🎮
+    title: Optional Discord access
+    details: Same capabilities as Telegram for allowlisted Discord users — DMs and one optional server channel — with no privileged Message Content intent required.
 ---
 
 ## Start here

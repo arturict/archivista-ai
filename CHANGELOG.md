@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### Discord companion bot
+
+- Add an optional Discord companion bot with full Telegram parity: bounded
+  document Q&A with follow-ups, cited originals, one attachment upload with
+  Paperless consumption and duplicate behavior, optional metadata classification,
+  active action listing, action proposals, and approve/reject buttons.
+- Allowlist is JSON (`DISCORD_USERS_JSON`) with one entry per user:
+  `discordId` (snowflake), `paperlessToken`, optional `paperlessUrl`,
+  optional `householdId` / `memberId`. Each user gets a separate Paperless
+  token, so Paperless remains the permission authority.
+- DM channel: all allowlisted-user messages are processed.
+- Optional home channel (`DISCORD_HOME_CHANNEL_ID`): only native slash
+  commands, bot @-mentions, or replies to the bot are processed; unaddressed
+  messages are ignored so no privileged Message Content intent is required.
+- Bots, webhooks, unknown users, and other channels are silently ignored.
+- Conversation history is isolated by Discord user and channel, bounded by
+  `DISCORD_HISTORY_TURNS` (default 6), and kept only in process memory.
+- Native slash commands: `/start`, `/clear`, `/actions`, `/privacy`.
+- Document download and approval buttons encode the requesting Discord user ID.
+  Foreign or replayed interactions are rejected without action. Home-channel
+  document downloads are ephemeral.
+- Attachment uploads validate HTTPS Discord CDN URLs, sanitized filenames,
+  exactly one attachment, and file size before and during download.
+  Default and hard maximum: 10 MiB (`DISCORD_MAX_FILE_BYTES`).
+- Automatic AI metadata for Discord uploads is a separate explicit opt-in
+  (`DISCORD_UPLOAD_AUTOMATIC_METADATA=no` default), identical to Telegram.
+- Discord failure never terminates the web server; the bot starts cleanly and
+  is stopped gracefully alongside Telegram on shutdown.
+- Shared companion business logic (search planning, Q&A, action targeting,
+  classification, parsing, and text chunking) extracted into
+  `services/companionBotInternals.ts`; all Telegram env names,
+  behavior, exports, and tests are preserved without change.
+- New Compose / env pass-through for all nine Discord variables.
+- New focused test suite (`tests/discord-bot.test.js`) covering parser,
+  snowflakes, allowlist, routing, mentions, history isolation, chunking,
+  attachments, CDN validation, size limits, duplicate behavior, slash commands,
+  requester-bound buttons, replay rejection, and Telegram compatibility.
+
 ## 3.2.6 - 2026-07-30
 
 ### Safer deployment defaults

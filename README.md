@@ -223,6 +223,62 @@ are also sent to the configured model provider; a local Ollama or compatible
 endpoint keeps that AI step local, but does not make Telegram local. Treat
 calculated totals as assistant summaries rather than accounting-grade results.
 
+### Optional Discord bot
+
+Set `DISCORD_BOT_ENABLED=yes`, provide an application bot token in
+`DISCORD_BOT_TOKEN`, and allowlist users with independent Paperless tokens:
+
+```dotenv
+DISCORD_USERS_JSON=[{"discordId":"123456789012345678","paperlessToken":"token-for-that-user"}]
+```
+
+**Bot and application setup** (Discord Developer Portal):
+
+1. Create an application at <https://discord.com/developers/applications>.
+2. Go to the **Bot** page and create a bot. Copy the bot token into `DISCORD_BOT_TOKEN`.
+3. Under **Bot → Privileged Gateway Intents**, disable all three privileged intents.
+   Tagvico's Discord bot **does not require Message Content Intent**.
+4. Go to **OAuth2 → URL Generator** and select the `bot` and `applications.commands` scopes.
+5. Under **Bot Permissions**, select: **Send Messages**, **Read Message History**,
+   **View Channels**, **Attach Files**, **Use Slash Commands**.
+6. Invite the bot to your server with the generated URL.
+
+**Minimum required scopes:** `bot`, `applications.commands`
+
+Unknown users, bots, webhooks, and other channels are silently ignored. In DMs,
+all text, slash commands, and attachments from allowlisted users are processed.
+In the optional home channel (`DISCORD_HOME_CHANNEL_ID`), only native slash
+commands, bot @-mentions, or replies to the bot are processed; unaddressed
+messages are ignored so no privileged Message Content intent is needed.
+
+To copy IDs, enable **User Settings → Advanced → Developer Mode** in Discord,
+then right-click a user and choose **Copy User ID**. Right-click the chosen
+channel and choose **Copy Channel ID** for `DISCORD_HOME_CHANNEL_ID`.
+
+Conversation history is bounded, kept in memory per Discord user and channel,
+and cleared by `/clear` or a restart. Search, downloads, and uploads use the
+matching user's Paperless token, so Paperless remains the permission authority.
+
+Document download and approval buttons are bound to the originating Discord
+user ID. Attempts by a different user to interact with another user's button
+are rejected without any action. Home-channel document downloads are ephemeral.
+
+File uploads must be HTTPS Discord CDN URLs with a sanitized filename and a
+size within the 10 MiB default and hard maximum. Set
+`DISCORD_UPLOAD_AUTOMATIC_METADATA=yes` only if Discord uploads may bypass
+the web review queue and write AI-generated metadata immediately.
+
+Discord chats are not end-to-end encrypted. Questions, uploads, and originals
+returned through the bot pass through Discord. Retrieved OCR text and queries
+are also sent to the configured model provider. Answers to @mentions and
+replies in the home channel are normal channel messages visible to members who
+can access that channel; slash-command responses and document downloads there
+are ephemeral.
+
+Optional tuning variables: `DISCORD_UPLOAD_TIMEOUT_SECONDS` (default `180`),
+`DISCORD_MAX_DOCUMENTS` (default `8`), `DISCORD_HISTORY_TURNS` (default `6`),
+`DISCORD_MAX_FILE_BYTES` (default and hard maximum `10485760`). See `.env.example` for all options.
+
 ### OCR rescue and failure recovery
 
 Documents with insufficient OCR enter a durable rescue queue when `OCR_ENABLED=yes`. Open **Recovery** to run Mistral OCR, an OpenAI-compatible vision endpoint, or native Ollama vision. Local PDF OCR renders at most `OCR_MAX_PAGES` pages with `pdftoppm`. AI and OCR provider failures are attempted up to three times and then enter **Permanently failed**, so a broken document cannot loop forever.

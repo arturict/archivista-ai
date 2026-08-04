@@ -214,6 +214,36 @@ approve/reject cards. Approval uses the same executor and audit trail as web.
 Action Center linking is accepted only when the Telegram entry points at the
 same Paperless instance as the main Tagvico configuration.
 
+## Optional Discord family interface
+
+An opt-in Discord companion bot extends the same capabilities as the Telegram
+interface to Discord users. Allowlisted users search the archive in natural
+language, ask follow-up questions, download cited originals, and send a PDF or
+attachment into Paperless. Each Discord snowflake maps to its own Paperless API
+token; unknown users, bots, webhooks, and other channels are silently ignored.
+
+In direct messages all content is processed. In the optional home channel
+(`DISCORD_HOME_CHANNEL_ID`), only native slash commands, bot @-mentions, or
+replies to the bot are processed. Unaddressed messages are ignored so no
+privileged Message Content intent is required.
+
+Document download and approval buttons are bound to the originating Discord
+user ID. Foreign or replayed interactions are rejected privately. Home-channel
+document downloads are delivered as ephemeral messages visible only to the
+requesting user.
+
+File uploads validate HTTPS Discord CDN URLs, sanitized filenames, exactly one
+attachment, and size before and during download. Default and hard maximum is
+10 MiB. Automatic metadata classification for Discord uploads is a separate
+explicit opt-in (`DISCORD_UPLOAD_AUTOMATIC_METADATA=yes`) that bypasses the web
+review queue, identical in intent to the Telegram equivalent.
+
+When a Discord allowlist entry also contains `householdId` and `memberId`,
+`/actions` lists open cases and explicit action requests can create approve/reject
+buttons. Approval uses the same executor and audit trail as web and Telegram.
+
+Native slash commands: `/start`, `/clear`, `/actions`, `/privacy`.
+
 ## Optional anonymous installation analytics
 
 Installation analytics are off by default. Administrators can preview the

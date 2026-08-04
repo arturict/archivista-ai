@@ -133,6 +133,17 @@ module.exports = {
     maxFileBytes: parsePositiveInteger(process.env.TELEGRAM_MAX_FILE_BYTES, 20 * 1024 * 1024, 20 * 1024 * 1024),
     automaticUploadMetadata: parseEnvBoolean(process.env.TELEGRAM_UPLOAD_AUTOMATIC_METADATA, 'no')
   },
+  discord: {
+    enabled: parseEnvBoolean(process.env.DISCORD_BOT_ENABLED, 'no'),
+    botToken: process.env.DISCORD_BOT_TOKEN || '',
+    usersJson: process.env.DISCORD_USERS_JSON || '[]',
+    homeChannelId: process.env.DISCORD_HOME_CHANNEL_ID || '',
+    uploadTimeoutSeconds: parsePositiveInteger(process.env.DISCORD_UPLOAD_TIMEOUT_SECONDS, 180, 900),
+    maxDocuments: parsePositiveInteger(process.env.DISCORD_MAX_DOCUMENTS, 8, 20),
+    historyTurns: parsePositiveInteger(process.env.DISCORD_HISTORY_TURNS, 6, 20),
+    maxFileBytes: parsePositiveInteger(process.env.DISCORD_MAX_FILE_BYTES, 10 * 1024 * 1024, 10 * 1024 * 1024),
+    automaticUploadMetadata: parseEnvBoolean(process.env.DISCORD_UPLOAD_AUTOMATIC_METADATA, 'no')
+  },
   injectedEnvironment,
   openrouter: {
     apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || '',
