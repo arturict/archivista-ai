@@ -140,6 +140,56 @@ response.
 Read [Privacy and security](./privacy) before enabling the bot. Telegram bot
 chats are not end-to-end encrypted, and model-provider data terms still apply.
 
+## Optional Discord bot
+
+Create an application at the [Discord Developer Portal](https://discord.com/developers/applications).
+On the **Bot** page create a bot, copy the token into `DISCORD_BOT_TOKEN`, and
+disable all three **Privileged Gateway Intents** — Tagvico does not need Message
+Content Intent. Use **OAuth2 → URL Generator** with the `bot` and
+`applications.commands` scopes and the minimum bot permissions below, then
+invite the bot with the generated URL.
+
+**Minimum bot permissions:** Send Messages, Read Message History, View Channels,
+Attach Files, Use Slash Commands.
+
+Obtain each person's Discord user ID (numeric snowflake) and create a separate
+Paperless API token for each person. Add the following to the Tagvico service:
+
+Enable **User Settings → Advanced → Developer Mode** in Discord, right-click a
+user, and choose **Copy User ID**. Right-click the selected server channel and
+choose **Copy Channel ID** for `DISCORD_HOME_CHANNEL_ID`.
+
+```yaml
+environment:
+  DISCORD_BOT_ENABLED: "yes"
+  DISCORD_BOT_TOKEN: "replace-with-the-bot-token"
+  DISCORD_USERS_JSON: >-
+    [{"discordId":"123456789012345678","paperlessToken":"one-users-paperless-token","householdId":"copy-from-settings","memberId":"copy-from-settings"}]
+  # Optional: one server channel ID for slash commands and @-mentions.
+  DISCORD_HOME_CHANNEL_ID: ""
+  # Explicit opt-in: bypasses the Tagvico review queue for metadata on bot uploads.
+  DISCORD_UPLOAD_AUTOMATIC_METADATA: "no"
+```
+
+In direct messages, all allowlisted-user content is processed. In the optional
+home channel, only slash commands, bot @-mentions, and replies to the bot that
+keep the bot mention enabled are processed; unaddressed messages are ignored.
+Messages from unknown users, bots, webhooks, and other channels receive no
+response. Unauthorized slash commands receive a private unavailable response.
+
+Optional tuning variables: `DISCORD_UPLOAD_TIMEOUT_SECONDS` (default `180`),
+`DISCORD_MAX_DOCUMENTS` (default `8`), `DISCORD_HISTORY_TURNS` (default `6`),
+`DISCORD_MAX_FILE_BYTES` (default and hard maximum `10485760`, i.e. 10 MiB).
+The Compose file passes every Discord setting through to the application container.
+
+`paperlessUrl` may be added per allowlist entry; otherwise `PAPERLESS_API_URL`
+is used. An entry linked to the Action Center must use the same Paperless
+instance as the main configuration. Document download and approval buttons are
+bound to the requesting user; another user cannot interact with them.
+
+Read [Privacy and security](./privacy) before enabling the bot. Discord bot
+messages are not end-to-end encrypted, and model-provider data terms still apply.
+
 ## Docker run alternative
 
 ```bash

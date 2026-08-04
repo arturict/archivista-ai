@@ -57,6 +57,42 @@ Answers derived from OCR can be incomplete or wrong. In particular, totals and
 comparisons are assistant summaries rather than accounting-grade calculations;
 use the cited-original buttons to verify them.
 
+## Discord bot boundary
+
+The optional Discord interface is not a local transport and Discord bot messages
+are not end-to-end encrypted. Questions, photos, PDFs, and any original sent
+back through a download button pass through Discord under its terms. Retrieved
+Paperless OCR and the user's question are sent to the configured Tagvico model
+provider. Choosing local Ollama or a local compatible endpoint keeps the model
+step on infrastructure you control, but does not change the Discord boundary.
+
+Only explicitly allowlisted Discord snowflake IDs are processed. In direct
+messages, all allowlisted-user content is handled. In the optional home channel,
+only slash commands, bot @-mentions, or replies to the bot that keep the bot
+mention enabled are processed;
+unaddressed messages are ignored so no privileged Message Content intent is
+required. Messages from bots, webhooks, unknown users, and other channels
+receive no response. Unauthorized slash commands receive a private unavailable
+response.
+
+Each allowlisted Discord ID has a separate Paperless API token. Paperless
+therefore remains responsible for document visibility and mutation permissions.
+The allowlist and tokens are configuration secrets; do not commit them. The bot
+has no conversation database: bounded per-user, per-channel history lives in
+process memory and is removed by `/clear` or restart.
+
+Document download and approval buttons are bound to the requesting Discord user
+ID. A different user cannot replay or reuse another user's button. Home-channel
+document downloads and slash-command responses are ephemeral (visible only to
+the requesting user). Answers triggered by @mentions or replies are ordinary
+channel messages visible to every member who can read that channel.
+
+File uploads are validated against HTTPS Discord CDN URLs, sanitized filenames,
+exactly one attachment, and a 10 MiB default and hard maximum. Automatic AI
+metadata classification for Discord uploads is a separate explicit opt-in
+(`DISCORD_UPLOAD_AUTOMATIC_METADATA=yes`); the default leaves Paperless
+consumption rules in control.
+
 ## Screenshot policy
 
 Documentation screenshots must be inspected as final rendered pixels before

@@ -35,6 +35,45 @@ model provider as described above. A local model can keep the inference step
 on operator-controlled infrastructure, but it does not make Telegram a local
 or end-to-end encrypted transport.
 
+## Optional Discord interface
+
+An operator may enable a Discord bot and allowlist Discord user IDs (numeric
+snowflakes) with separate Paperless API tokens. This configuration remains on
+the installation and is not sent to the Tagvico project. Messages from unknown
+users, bots, webhooks, and other channels are silently ignored. Unauthorized
+slash commands receive only a private unavailable response.
+
+In direct messages, all content from allowlisted users is processed. In the
+optional home channel, only native slash commands, bot @-mentions, or replies
+to the bot that keep the bot mention enabled trigger processing; unaddressed
+messages are ignored. The bot does
+not request Discord's privileged Message Content intent.
+
+Conversation history is bounded, isolated by Discord user and channel,
+held only in process memory, and removed by `/clear` or restart. Document
+download and approval buttons are bound to the originating Discord user ID;
+attempts by another user to replay an interaction are rejected without action.
+Home-channel document downloads are delivered as ephemeral messages.
+Answers triggered by @mentions or replies are ordinary channel messages and
+are visible to every member who can read that channel. Slash-command responses
+are ephemeral.
+
+Discord bot messages are not end-to-end encrypted. Questions, uploads, and
+original documents returned through the bot are processed by Discord under its
+terms. Retrieved OCR text and questions are also processed by the selected
+model provider as described above. A local model can keep the inference step
+on operator-controlled infrastructure, but it does not make Discord a local or
+end-to-end encrypted transport.
+
+File uploads are validated against HTTPS Discord CDN URLs, a sanitized
+filename, and a 10 MiB default and hard maximum. Per-user Paperless tokens mean
+Paperless remains the document-permission authority for each user.
+
+Automatic AI metadata classification for Discord bot uploads is a separate
+explicit opt-in (`DISCORD_UPLOAD_AUTOMATIC_METADATA=yes`) because it bypasses
+the web review queue. The provider boundary described in the document-processing
+section applies equally to this classification pass.
+
 ## Optional installation analytics
 
 Anonymous installation analytics are **off by default**. An administrator may

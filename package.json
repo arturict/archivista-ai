@@ -82,6 +82,7 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
+    "discord.js": "^14.27.0",
     "dotenv": "^16.4.7",
     "ejs": "6.0.1",
     "express": "^4.21.2",
@@ -117,7 +118,7 @@
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-jsdoc": "^50.6.3",
     "globals": "^16.0.0",
-    "postcss": "8.5.20",
+    "postcss": "8.5.25",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.62.1",
@@ -130,7 +131,10 @@
     ]
   },
   "overrides": {
-    "postcss": "8.5.20",
+    "postcss": "8.5.25",
+    "brace-expansion@^5.0.0": "5.0.9",
+    "fast-uri@^3.0.0": "3.1.5",
+    "undici@^6.0.0": "6.28.0",
     "sharp": "0.35.3",
     "vite": "6.4.3"
   }

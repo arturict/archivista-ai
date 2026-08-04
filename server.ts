@@ -68,6 +68,7 @@ const reviewService = require('./services/reviewService');
 const { blockLegacyPublicImages, removeLegacyPublicThumbnailCache } = require('./services/staticPathSecurity');
 const telemetryService = require('./services/telemetryService');
 const telegramBotService = require('./services/telegramBotService');
+const discordBotService = require('./services/discordBotService');
 const actionSyncService = require('./services/actionSyncService');
 
 const htmlLogger = new Logger({
@@ -849,7 +850,10 @@ process.on('unhandledRejection', (reason, promise) => {
 async function gracefulShutdown(signal: NodeJS.Signals) {
   console.log(`[DEBUG] Received ${signal} signal. Starting graceful shutdown...`);
   try {
-    await telegramBotService.stop();
+    await Promise.all([
+      telegramBotService.stop(),
+      discordBotService.stop(),
+    ]);
     console.log('[DEBUG] Closing database...');
     await documentModel.closeDatabase();
     console.log('[DEBUG] Database closed successfully');
@@ -892,6 +896,9 @@ async function startServer() {
       console.log(`Server running on port ${port}`);
       telemetryService.start();
       telegramBotService.start();
+      try { discordBotService.start(); } catch (error) {
+        console.warn('[Discord] Bot startup error (server continues):', error instanceof Error ? error.message : String(error));
+      }
       startScanning();
     });
   } catch (error) {
