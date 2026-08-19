@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, FileStack, KeyRound, Sparkles } from 'lucide-react';
 import { InlineStatus } from './inline-status';
+import { PaperlessDiscovery } from './paperless-discovery';
 import { SettingsRow, SettingsSection } from './settings-section';
 import type { ProviderDescriptor } from './types';
 
@@ -161,6 +162,14 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
       message: modelId
         ? 'Model changed. Check the runtime again to verify this exact model.'
         : 'Choose or enter a model, then check the runtime.'
+    });
+  };
+
+  const useDiscoveredPaperless = (url: string) => {
+    update('paperlessUrl', url);
+    setStatus({
+      kind: 'neutral',
+      message: `Using ${url}. Add an API token, then check Paperless.`
     });
   };
 
@@ -447,6 +456,17 @@ export function SetupWizard({ providers }: { providers: ProviderDescriptor[] }) 
             />
           </label>
         </div>
+      </SettingsRow>
+      <SettingsRow
+        title="Find Paperless-ngx"
+        description="Not sure about the address? Scan common Docker, host and local-network addresses. Discovery is read-only and only fills the Base URL when you pick a result."
+        stack
+      >
+        <PaperlessDiscovery
+          baseUrl={state.paperlessUrl}
+          endpoint="/api/paperless/discover"
+          onSelect={useDiscoveredPaperless}
+        />
       </SettingsRow>
     </SettingsSection> : null}
 

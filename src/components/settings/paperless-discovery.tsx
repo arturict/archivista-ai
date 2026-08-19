@@ -13,7 +13,23 @@ type DiscoveredInstance = {
   requiresAuth?: boolean;
 };
 
-export function PaperlessDiscovery({ baseUrl }: { baseUrl: string }) {
+type PaperlessDiscoveryProps = {
+  baseUrl: string;
+  /**
+   * Settings runs discovery through the authenticated Next route. First-run setup has no
+   * owner yet and uses the backend endpoint, which the setup middleware opens until the
+   * installation is configured.
+   */
+  endpoint?: string;
+  /** When provided, each result offers to fill the connection form instead of only reporting. */
+  onSelect?: (url: string) => void;
+};
+
+export function PaperlessDiscovery({
+  baseUrl,
+  endpoint = '/api/paperless/discovery',
+  onSelect
+}: PaperlessDiscoveryProps) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [instances, setInstances] = useState<DiscoveredInstance[]>([]);
@@ -23,13 +39,13 @@ export function PaperlessDiscovery({ baseUrl }: { baseUrl: string }) {
     setScanning(true);
     setError('');
     try {
-      const response = await fetch('/api/paperless/discovery', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hint: baseUrl })
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Paperless discovery failed.');
+      if (!response.ok || body.success === false) throw new Error(body.error || 'Paperless discovery failed.');
       setInstances(Array.isArray(body.instances) ? body.instances : []);
       setScanned(Number(body.scanned || 0));
     } catch (scanError) {
@@ -62,7 +78,13 @@ export function PaperlessDiscovery({ baseUrl }: { baseUrl: string }) {
             {instance.requiresAuth ? ' · authentication required' : ''}
           </small>
         </span>
-        <span className="settings-badge">Read only</span>
+        {onSelect ? <button
+          className="settings-button"
+          type="button"
+          onClick={() => onSelect(instance.url)}
+        >
+          Use this URL
+        </button> : <span className="settings-badge">Read only</span>}
       </li>)}
     </ul> : null}
   </div>;
