@@ -31,6 +31,10 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
     read('routes/setup.ts'),
     /status\.models\.includes\(\s*effectiveSetupConfig\.COPILOT_MODEL \|\| effectiveSetupConfig\.AI_MODEL/
   );
+  assert.match(wizard, /<PaperlessDiscovery/);
+  assert.match(wizard, /endpoint="\/api\/paperless\/discover"/);
+  assert.match(wizard, /onSelect=\{useDiscoveredPaperless\}/);
+  assert.match(read('routes/setup.ts'), /router\.post\('\/api\/paperless\/discover', allowDuringSetup/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 
