@@ -34,7 +34,19 @@ test('first-run setup verifies both dependencies and resumes without browser-sto
   assert.match(wizard, /<PaperlessDiscovery/);
   assert.match(wizard, /endpoint="\/api\/paperless\/discover"/);
   assert.match(wizard, /onSelect=\{useDiscoveredPaperless\}/);
-  assert.match(read('routes/setup.ts'), /router\.post\('\/api\/paperless\/discover', allowDuringSetup/);
+  const setupRoutes = read('routes/setup.ts');
+  assert.match(setupRoutes, /router\.post\('\/api\/paperless\/discover', allowDuringSetup/);
+  // Discovery has to reach a Paperless container on the same Docker bridge, not
+  // just the hardcoded home-LAN range, so the sweep comes from real interfaces.
+  assert.match(setupRoutes, /function localSweepPrefixes/);
+  assert.match(setupRoutes, /os\.networkInterfaces\(\)/);
+  assert.match(setupRoutes, /new Set\(\[\.\.\.localSweepPrefixes\(\), '192\.168\.1'\]\)/);
+  assert.match(setupRoutes, /'paperless-webserver'/);
+  assert.match(setupRoutes, /host\.docker\.internal/);
+  // ~1000 probes per sweep must not open ~1000 sockets at once.
+  assert.match(setupRoutes, /DISCOVERY_PROBE_CONCURRENCY = 256/);
+  assert.match(setupRoutes, /await probeDiscoveryCandidates\(candidates\.map\(String\)\)/);
+  assert.doesNotMatch(setupRoutes, /Promise\.all\(candidates\.map/);
   assert.match(wizard, /Restored non-secret fields for this tab/);
   assert.match(wizard, /Object\.entries\(state\.providerValues\)\.filter/);
 

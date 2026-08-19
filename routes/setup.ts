@@ -31,6 +31,7 @@ interface Res {
 }
 type Next = (error?: unknown) => unknown;
 const router = express.Router();
+const os = require('node:os');
 const axios = require('axios');
 const setupService = require('../services/setupService.js');
 const paperlessService = require('../services/paperlessService.js');
@@ -2606,6 +2607,31 @@ async function probePaperlessInstance(baseUrl: string, timeout = 2500, token = '
 /**
  * Build a candidate list of base URLs to probe for Paperless-ngx auto-discovery.
  */
+// Sweeping every attached network is what lets discovery work inside Docker:
+// a container sits on a bridge such as 172.18.0.0/16 and its Paperless neighbour
+// is a few addresses along, which a hardcoded home-LAN range never reaches.
+const DISCOVERY_MAX_SWEPT_SUBNETS = 3;
+
+/**
+ * Returns the /24 prefixes worth enumerating, taken from this machine's own
+ * IPv4 interfaces. Wider networks (a /16 Docker bridge) are narrowed to the /24
+ * holding our own address, because Docker and DHCP hand out addresses from the
+ * bottom of the range rather than scattering them across 65k hosts.
+ */
+function localSweepPrefixes(): string[] {
+  const prefixes = new Set<string>();
+  for (const addresses of Object.values(os.networkInterfaces() || {})) {
+    for (const address of (addresses || []) as Array<{ family: string; internal: boolean; address: string }>) {
+      if (address.family !== 'IPv4' || address.internal) continue;
+      const octets = address.address.split('.');
+      if (octets.length !== 4) continue;
+      prefixes.add(octets.slice(0, 3).join('.'));
+      if (prefixes.size >= DISCOVERY_MAX_SWEPT_SUBNETS) return Array.from(prefixes);
+    }
+  }
+  return Array.from(prefixes);
+}
+
 function buildDiscoveryCandidates(hint: string | undefined) {
   const candidates = new Set();
   const add = (u: string | undefined) => {
@@ -2625,10 +2651,14 @@ function buildDiscoveryCandidates(hint: string | undefined) {
   ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://host.docker.internal:8000']
     .forEach(add);
 
-  // Common homelab/LAN addresses. This intentionally includes the local /24 so
-  // setup does not only rely on Docker DNS names.
-  for (let host = 1; host <= 254; host += 1) {
-    add(`http://192.168.1.${host}:8000`);
+  // Every network this machine is actually on, plus the most common homelab
+  // range. 192.168.1.0/24 stays in the list because a bridged container reaches
+  // the host LAN through NAT while its own addresses are all 172.x.
+  const sweptPrefixes = new Set([...localSweepPrefixes(), '192.168.1']);
+  for (const prefix of sweptPrefixes) {
+    for (let host = 1; host <= 254; host += 1) {
+      add(`http://${prefix}.${host}:8000`);
+    }
   }
 
   // If the hint points at a host, also try the standard Paperless port on that host.
@@ -2670,6 +2700,28 @@ async function validatePaperlessTokenPermissions(baseUrl: string, token: string,
   return { success: true, message: 'Paperless token can read documents and metadata.' };
 }
 
+// Sweeping several /24s means ~1000 probes per scan. Opening them all at once
+// exhausts the default file-descriptor limit, so run a bounded pool instead:
+// unreachable addresses cost a full probe timeout, and 256 in flight keeps the
+// whole sweep inside the 15s budget the settings proxy allows.
+const DISCOVERY_PROBE_CONCURRENCY = 256;
+
+async function probeDiscoveryCandidates(candidates: string[]) {
+  const results: Array<Awaited<ReturnType<typeof probePaperlessInstance>>> = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < candidates.length) {
+      const index = next;
+      next += 1;
+      results[index] = await probePaperlessInstance(candidates[index]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(DISCOVERY_PROBE_CONCURRENCY, candidates.length) }, worker)
+  );
+  return results;
+}
+
 /**
  * POST /api/paperless/discover
  * Scans a curated set of candidate URLs (plus an optional hint) for reachable
@@ -2679,7 +2731,7 @@ router.post('/api/paperless/discover', allowDuringSetup, express.json(), async (
   try {
     const hint = String((req.body && req.body.hint) || (req.query && req.query.hint) || '');
     const candidates = buildDiscoveryCandidates(hint);
-    const results = await Promise.all(candidates.map((url) => probePaperlessInstance(String(url))));
+    const results = await probeDiscoveryCandidates(candidates.map(String));
     const instances = results
       .filter((r) => r.ok)
       // de-duplicate by normalized url

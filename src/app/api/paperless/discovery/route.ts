@@ -22,7 +22,9 @@ export async function POST(request: Request) {
       body: JSON.stringify({ hint: String(hint || '').slice(0, 2048) }),
       cache: 'no-store',
       redirect: 'manual',
-      signal: AbortSignal.timeout(15_000)
+      // A full sweep probes every attached /24, so allow for the slowest case
+      // where most addresses are firewalled and burn their whole probe timeout.
+      signal: AbortSignal.timeout(45_000)
     });
     const text = await response.text();
     return new Response(text, {
