@@ -1,5 +1,34 @@
 # Release notes
 
+## v3.3.0
+
+Released 27 August 2026.
+
+Tagvico 3.3.0 adds an optional Discord companion bot with full Telegram
+parity. Allowlisted users can ask bounded document questions with cited
+originals, upload one attachment at a time into Paperless, list active
+actions, and approve or reject proposed actions from Discord. Each user is
+configured with their own Paperless token, so Paperless remains the permission
+authority. The bot answers direct messages and, optionally, one home channel
+where only slash commands, mentions, and replies to the bot are processed —
+no privileged Message Content intent is required. Conversation history stays
+in process memory, bounded per user and channel. The bot is off unless its
+environment variables are set.
+
+First-run setup gains **Scan for Paperless**: the wizard can search the
+attached networks for a running Paperless-ngx installation and fill the Base
+URL field, instead of requiring the URL up front. Discovery now derives its
+scan ranges from the machine's own network interfaces, so a Tagvico container
+finds a Paperless container on the same Docker bridge network.
+
+The public landing page now uses self-hosted, cookie-free analytics. The
+application, bundled docs, and installed containers remain telemetry-free
+apart from the existing opt-in aggregate reporting.
+
+Upgrade by backing up `tagvico_ai_data`, pinning
+`ghcr.io/arturict/tagvico-ai:3.3.0`, and recreating only the Tagvico
+container. This release does not change the data schema.
+
 ## v3.2.6
 
 Released 30 July 2026.

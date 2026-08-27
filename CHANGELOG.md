@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.3.0 - 2026-08-27
 
 ### Discord companion bot
 
@@ -40,6 +40,31 @@
   snowflakes, allowlist, routing, mentions, history isolation, chunking,
   attachments, CDN validation, size limits, duplicate behavior, slash commands,
   requester-bound buttons, replay rejection, and Telegram compatibility.
+
+### Paperless discovery in first-run setup
+
+- Add the "Scan for Paperless" control to the setup wizard, so a fresh
+  installation can find its Paperless-ngx instance without knowing the URL up
+  front. The wizard uses the backend endpoint that is already open during
+  onboarding and offers "Use this URL" to fill the Base URL field. Settings
+  keeps the authenticated route and the read-only badge.
+- Derive the discovery sweep from this machine's own IPv4 interfaces instead
+  of a hardcoded `192.168.1.0/24`, so a Tagvico container finds a Paperless
+  container on a `172.x` Docker bridge. A `/16` bridge is narrowed to the
+  `/24` holding our address, and `192.168.1.0/24` is kept for the
+  bridged-container-to-host-LAN case.
+
+### Landing analytics
+
+- Add self-hosted, cookie-free Umami analytics to the public landing page
+  only. The application, docs, and legacy docs landing remain telemetry-free;
+  a stray tracker on the legacy docs landing was removed in the same series.
+
+### Upgrade note
+
+- Back up `tagvico_ai_data`, pull the pinned `3.3.0` image, and recreate only
+  the Tagvico container. This release does not change the data schema. The
+  Discord companion bot stays off unless its environment variables are set.
 
 ## 3.2.6 - 2026-07-30
 
