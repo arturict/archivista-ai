@@ -71,9 +71,10 @@ the image you pinned even when the public website changes.
 
 ## 3. Finish guided setup
 
-1. Enter the Paperless base URL without `/api`, then paste a Paperless API
-   token. Setup checks the connection and the read permissions Tagvico needs
-   before continuing.
+1. Enter the Paperless base URL without `/api`, or use **Scan for Paperless**
+   to search the attached networks and fill the field from a found
+   installation. Then paste a Paperless API token. Setup checks the connection
+   and the read permissions Tagvico needs before continuing.
 2. Choose a [model provider](./providers). Built-in endpoints are prefilled.
    Setup verifies the connection and loads its live model catalog.
 3. Select one of the verified models and create the local Tagvico owner
