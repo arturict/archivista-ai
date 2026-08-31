@@ -8,6 +8,9 @@ concurrency:
   group: stale-issue-maintenance
   cancel-in-progress: true
 
+permissions:
+  issues: write
+
 jobs:
   stale:
     runs-on: ubuntu-latest
@@ -17,7 +20,7 @@ jobs:
     - name: Close stale issues and pull requests
       uses: actions/stale@v11
       with:
-        repo-token: ${{ secrets.stale_bot }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
         stale-issue-message: "This issue has been marked as stale due to inactivity. Please respond to keep it open."
         stale-pr-message: "This pull request has been marked as stale due to inactivity. Please update it to keep it open."
         close-issue-message: "This issue has been closed due to lack of response."
