@@ -74,15 +74,6 @@ layout while their live data is loading. Provider and model catalogs use the
 same pattern instead of replacing the interface with loading text. The former EJS interfaces
 for user-facing workflows are no longer part of the visible application.
 
-## Controlled tagging
-
-Choose whether the model may create open-ended tags or must stay within a
-controlled vocabulary. Tag groups make a larger Paperless tag catalog easier
-to manage, and a per-document maximum prevents noisy assignments. Four is the
-default hard ceiling in both modes. The shared provider prompt asks for the
-smallest useful set and avoids repeating language, correspondent, or document
-type as tags.
-
 ## Review-first tag unification
 
 The dedicated **Organize tags** workspace loads the current Paperless vocabulary and lets one configured,
@@ -100,7 +91,29 @@ The representative capture uses generic duplicate tags and synthetic workspace
 labels. It contains no document content, real account identifiers, credentials,
 or endpoints.
 
-## Prompt control
+## Included utility: reviewable metadata filing
+
+AI metadata filing is an opt-in utility, not the core of Tagvico. New
+installations start with scheduled scans paused and writes in **Review
+first**; nothing is tagged until you deliberately enable it.
+
+Paperless-ngx v3 ships native AI metadata suggestions with its own workflow
+action. Choose one writer: if Paperless AI applies metadata automatically,
+leave Tagvico's filing off or in Review first. Tagvico's utility remains the
+right choice when you want a durable review queue, restore snapshots,
+per-field control, provider choice with cost modes, or you run
+Paperless-ngx 2.x. Never let both write the same fields automatically.
+
+### Controlled tagging
+
+Choose whether the model may create open-ended tags or must stay within a
+controlled vocabulary. Tag groups make a larger Paperless tag catalog easier
+to manage, and a per-document maximum prevents noisy assignments. Four is the
+default hard ceiling in both modes. The shared provider prompt asks for the
+smallest useful set and avoids repeating language, correspondent, or document
+type as tags.
+
+### Prompt control
 
 The maintained general prompt works across providers. **Custom filing prompt**
 adds archive-specific terminology and preferences without replacing Tagvico's
@@ -108,7 +121,7 @@ contracts. **Advanced system prompt** can replace the general role
 instructions, while prompt-injection protection, minimal-tagging rules and the
 structured response contract remain mandatory.
 
-## Review-first filing
+### Review-first filing
 
 In **Review first** mode, durable suggestions wait for approval. Inspect the
 metadata diff, apply it, reject it, or leave it queued. Switching to Automatic
@@ -118,7 +131,7 @@ In **Automatic** mode, Tagvico validates and writes enabled fields directly to
 Paperless. Both modes support titles, tags, correspondents, document types,
 dates, languages, custom fields, and optional owner assignment.
 
-## History, restoration, and retry control
+### History, restoration, and retry control
 
 Every processing run records assigned metadata, field-level before/after
 changes, custom fields, token usage, event source, and the original snapshot.
@@ -138,7 +151,7 @@ Documents that must never be processed can instead be moved to the permanent
 queues a filter-bypassing rescan. Failed and Ignored counts remain visible in
 the sidebar.
 
-## OCR rescue
+### OCR rescue
 
 Documents with insufficient OCR can enter a durable rescue queue. Configure
 Mistral OCR, an OpenAI-compatible vision endpoint, or Ollama vision. Local PDF

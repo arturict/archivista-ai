@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Tagvico v3.2"
-  text: "A calmer workspace for Paperless-ngx"
-  tagline: File documents, research your archive, organize tags and keep every sensitive change visible.
+  text: "The Action Center for Paperless-ngx"
+  tagline: Paperless files it — Tagvico makes sure someone acts on it. Deadlines, households, approvals, and research with every sensitive change visible.
   image:
     src: /tagvico-icon.png
     alt: Tagvico AI
@@ -21,23 +21,23 @@ hero:
 
 features:
   - icon: 🗂️
-    title: Documents to useful work
-    details: Process documents, find the original, track deadlines and keep restore history in one workspace.
+    title: Documents to assigned work
+    details: One Action Case per document with owner, due date, priority, and up to 100 checklist steps — tracked to done, not just filed.
   - icon: ✅
     title: Ask Tagvico
-    details: Ask about documents and obligations while every Paperless search, document read and proposed write stays visible.
-  - icon: 🔌
-    title: Your model, your boundary
-    details: Tagvico owns the safe harness. Use Vercel AI SDK providers such as OpenCode Go or an optional read-only Codex SDK adapter.
-  - icon: 📈
-    title: Visible operations
-    details: Keep the established metadata automation, review queue, processing history, OCR recovery, retry controls, and restoration tools.
+    details: Ask about documents and obligations while every Paperless search, document read and proposed write stays visible and approval-gated.
   - icon: 💬
     title: Optional Telegram access
     details: Give allowlisted family members cited search, uploads, action lists, and approve/reject controls through their own Paperless tokens.
   - icon: 🎮
     title: Optional Discord access
     details: Same capabilities as Telegram for allowlisted Discord users — DMs and one optional server channel — with no privileged Message Content intent required.
+  - icon: 🔌
+    title: Your model, your boundary
+    details: Tagvico owns the safe harness. Use Vercel AI SDK providers such as OpenCode Go or an optional read-only Codex SDK adapter.
+  - icon: 📈
+    title: Included filing utility
+    details: Opt-in reviewable metadata filing with a review queue, processing history, OCR recovery, retry controls, and restoration tools — or use Paperless-ngx v3's native AI instead.
 ---
 
 ## Start here
@@ -45,7 +45,13 @@ features:
 Tagvico is a self-hosted action layer for an existing Paperless-ngx instance.
 It keeps Paperless as the document system of record while adding household
 ownership, checklists, deadlines, approval history, and a provider-neutral AI
-session runtime. Existing reviewable AI metadata filing remains available.
+session runtime.
+
+Reviewable AI metadata filing remains available as an opt-in utility.
+Paperless-ngx v3 ships native AI metadata suggestions of its own; use either,
+but do not run both in automatic write mode against the same fields — see
+[Features](./features#included-utility-reviewable-metadata-filing) for the
+coexistence guidance.
 
 This page tracks the latest stable v3 patch release. The version menu keeps
 older major-version guides available, while [Release notes](./release-notes)

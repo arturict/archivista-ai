@@ -23,6 +23,12 @@ commitments for the complete v3 release line:
 The household, Action Case, checklist, approval, and encrypted member-token
 records introduced by schema v5 are also preserved through compatible v3
 upgrades. Breaking changes to these contracts require a new major version.
+
+As of v3.3.0, OCR rescue, the ChatGPT-subscription (Codex) adapter, the
+GitHub Copilot adapter, and OpenAI Flex/Batch modes are in **maintenance
+mode**: they remain fully supported and receive bug and security fixes for
+the entire v3 line, but gain no new capabilities and are removal candidates
+for v4. See [`v4-plan.md`](v4-plan.md).
 Provider model names, prices, quotas, and account entitlements remain controlled
 by the provider and can change independently of Tagvico.
 

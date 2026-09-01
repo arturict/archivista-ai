@@ -2,7 +2,18 @@
 
 ## v3.3.0
 
-Released 27 August 2026.
+Released 1 September 2026.
+
+Tagvico 3.3.0 sharpens what Tagvico is for. Paperless-ngx v3 ships native AI
+metadata suggestions, so Tagvico now leads with the layer Paperless does not
+build: Action Cases, households, the approval boundary, and the family bots.
+Reviewable AI metadata filing remains fully supported as an opt-in included
+utility, and the documentation explains how to coexist with native Paperless
+AI — never two automatic writers on the same fields. As part of this focus,
+OCR rescue, the ChatGPT-subscription (Codex) adapter, the GitHub Copilot
+adapter, and OpenAI Flex/Batch modes enter maintenance mode for the rest of
+v3: they keep working and receive bug fixes, but are candidates for removal
+in v4.
 
 Tagvico 3.3.0 adds an optional Discord companion bot with full Telegram
 parity. Allowlisted users can ask bounded document questions with cited
@@ -14,6 +25,16 @@ where only slash commands, mentions, and replies to the bot are processed —
 no privileged Message Content intent is required. Conversation history stays
 in process memory, bounded per user and channel. The bot is off unless its
 environment variables are set.
+
+Both bots become proactive and hardened. Users linked to the Action Center
+receive DM reminders for household actions that are overdue or due within
+three days — assigned cases go to the assignee, unassigned cases to every
+linked member, at most one message per case, user, and day
+(`TELEGRAM_ACTION_REMINDERS` / `DISCORD_ACTION_REMINDERS`, default on).
+Every path that reaches the AI provider or moves document bytes is now
+per-user flood-limited, untrusted document titles are escaped before entering
+the model prompt, Telegram transport errors are scrubbed of the bot token
+before logging, and Discord document buttons are capped at the API maximum.
 
 First-run setup gains **Scan for Paperless**: the wizard can search the
 attached networks for a running Paperless-ngx installation and fill the Base
