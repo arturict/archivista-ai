@@ -131,7 +131,8 @@ module.exports = {
     maxDocuments: parsePositiveInteger(process.env.TELEGRAM_MAX_DOCUMENTS, 8, 20),
     historyTurns: parsePositiveInteger(process.env.TELEGRAM_HISTORY_TURNS, 6, 20),
     maxFileBytes: parsePositiveInteger(process.env.TELEGRAM_MAX_FILE_BYTES, 20 * 1024 * 1024, 20 * 1024 * 1024),
-    automaticUploadMetadata: parseEnvBoolean(process.env.TELEGRAM_UPLOAD_AUTOMATIC_METADATA, 'no')
+    automaticUploadMetadata: parseEnvBoolean(process.env.TELEGRAM_UPLOAD_AUTOMATIC_METADATA, 'no'),
+    actionReminders: parseEnvBoolean(process.env.TELEGRAM_ACTION_REMINDERS, 'yes')
   },
   discord: {
     enabled: parseEnvBoolean(process.env.DISCORD_BOT_ENABLED, 'no'),
@@ -142,7 +143,8 @@ module.exports = {
     maxDocuments: parsePositiveInteger(process.env.DISCORD_MAX_DOCUMENTS, 8, 20),
     historyTurns: parsePositiveInteger(process.env.DISCORD_HISTORY_TURNS, 6, 20),
     maxFileBytes: parsePositiveInteger(process.env.DISCORD_MAX_FILE_BYTES, 10 * 1024 * 1024, 10 * 1024 * 1024),
-    automaticUploadMetadata: parseEnvBoolean(process.env.DISCORD_UPLOAD_AUTOMATIC_METADATA, 'no')
+    automaticUploadMetadata: parseEnvBoolean(process.env.DISCORD_UPLOAD_AUTOMATIC_METADATA, 'no'),
+    actionReminders: parseEnvBoolean(process.env.DISCORD_ACTION_REMINDERS, 'yes')
   },
   injectedEnvironment,
   openrouter: {

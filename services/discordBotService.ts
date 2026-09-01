@@ -51,6 +51,12 @@ import {
   answerDocumentQuestion,
   buildActionApprovalPayload,
   classifyPaperlessUpload,
+  createUserRateLimiter,
+  collectDueReminders,
+  formatReminderText,
+  createDailyReminderTracker,
+  ReminderRecipient,
+  DueReminder,
   ChatTurn,
   PaperlessDocument,
 } from './companionBotInternals';
@@ -160,6 +166,53 @@ class DiscordBotService {
   private readonly histories = new Map<string, ChatTurn[]>();
   private homeChannelId = '';
   private running = false;
+  // Per-user flood control on the paths that reach the AI provider or move
+  // document bytes; Discord delivers events concurrently, so without this a
+  // single user could fan out parallel provider calls.
+  private readonly questionLimiter = createUserRateLimiter({ windowMs: 60_000, max: 10 });
+  private readonly uploadLimiter = createUserRateLimiter({ windowMs: 600_000, max: 6 });
+  private readonly downloadLimiter = createUserRateLimiter({ windowMs: 60_000, max: 12 });
+  private readonly reminderTracker = createDailyReminderTracker();
+  private reminderTimer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Send at most one proactive DM per case, linked user, and day for
+   * household actions that are overdue or due within the next three days.
+   */
+  private async checkActionReminders(): Promise<void> {
+    if (!this.client) return;
+    const linked = [...this.users.values()].filter((user) => user.householdId && user.memberId);
+    if (!linked.length) return;
+    const actionCenter = require('../models/actionCenter');
+    const today = new Date().toISOString().slice(0, 10);
+    const households = new Map<string, ReminderRecipient[]>();
+    for (const user of linked) {
+      const recipients = households.get(user.householdId!) || [];
+      recipients.push({ key: user.discordId, memberId: user.memberId! });
+      households.set(user.householdId!, recipients);
+    }
+    for (const [householdId, recipients] of households) {
+      let reminders: Map<string, DueReminder[]>;
+      try {
+        reminders = collectDueReminders(actionCenter.listCases(householdId), recipients, today);
+      } catch (error) {
+        console.warn(`[Discord] Reminder check failed: ${errorMessage(error)}`);
+        continue;
+      }
+      for (const [recipientKey, dueList] of reminders) {
+        const fresh = dueList.filter((reminder) => this.reminderTracker.shouldSend(recipientKey, reminder.caseId, today));
+        if (!fresh.length) continue;
+        try {
+          const recipient = await this.client.users.fetch(recipientKey);
+          for (const chunk of chunkDiscordText(formatReminderText(fresh, today))) {
+            await recipient.send({ content: chunk, allowedMentions: NO_MENTIONS });
+          }
+        } catch (error) {
+          console.warn(`[Discord] Reminder delivery failed: ${errorMessage(error)}`);
+        }
+      }
+    }
+  }
 
   start(): void {
     if (config.discord.enabled !== 'yes' || this.running) return;
@@ -253,10 +306,23 @@ class DiscordBotService {
       this.client?.destroy();
       this.client = null;
     });
+    if (config.discord.actionReminders === 'yes' && [...this.users.values()].some((user) => user.householdId && user.memberId)) {
+      this.reminderTimer = setInterval(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Discord] Reminder pass failed: ${errorMessage(error)}`));
+      }, 30 * 60 * 1000);
+      setTimeout(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Discord] Reminder pass failed: ${errorMessage(error)}`));
+      }, 30_000).unref?.();
+      this.reminderTimer.unref?.();
+    }
   }
 
   async stop(): Promise<void> {
     this.running = false;
+    if (this.reminderTimer) {
+      clearInterval(this.reminderTimer);
+      this.reminderTimer = null;
+    }
     this.histories.clear();
     if (this.client) {
       try {
@@ -588,6 +654,14 @@ class DiscordBotService {
     const question = cleanDiscordMention(message.content);
     if (!question) return;
 
+    if (!this.questionLimiter.tryConsume(message.author.id)) {
+      await this.sendText(
+        message.channel,
+        `You are sending questions faster than this bot allows. Try again in ${this.questionLimiter.retryAfterSeconds(message.author.id)} seconds.`
+      );
+      return;
+    }
+
     const histKey = this.historyKey(message.author.id, message.channelId);
     const history = this.histories.get(histKey) || [];
 
@@ -672,6 +746,14 @@ class DiscordBotService {
   ): Promise<void> {
     const attachment = message.attachments.first();
     if (!attachment) return;
+
+    if (!this.uploadLimiter.tryConsume(message.author.id)) {
+      await this.sendText(
+        message.channel,
+        `You are uploading faster than this bot allows. Try again in ${this.uploadLimiter.retryAfterSeconds(message.author.id)} seconds.`
+      );
+      return;
+    }
 
     const maxBytes = Math.min(
       Number(config.discord.maxFileBytes) || DEFAULT_MAX_FILE_BYTES,
@@ -862,6 +944,13 @@ class DiscordBotService {
         });
         return;
       }
+      if (!this.downloadLimiter.tryConsume(userId)) {
+        await interaction.reply({
+          content: `You are downloading documents faster than this bot allows. Try again in ${this.downloadLimiter.retryAfterSeconds(userId)} seconds.`,
+          ephemeral: true,
+        });
+        return;
+      }
       const documentId = Number(docMatch[1]);
       // Home channel downloads must be ephemeral
       await interaction.deferReply({ ephemeral: inHome });
@@ -956,8 +1045,9 @@ class DiscordBotService {
       const components: ActionRowBuilder<ButtonBuilder>[] = [];
 
       if (isLast && documents.length) {
-        // Up to 5 document buttons per row, up to 5 rows (25 total), but we cap at 8
-        const capped = documents.slice(0, Number(config.discord.maxDocuments) || 8);
+        // Up to 5 document buttons per row; Discord rejects messages with more
+        // than 5 action rows, so cap at 25 regardless of DISCORD_MAX_DOCUMENTS.
+        const capped = documents.slice(0, Math.min(Number(config.discord.maxDocuments) || 8, 25));
         // Build rows of up to 5 buttons
         for (let rowStart = 0; rowStart < capped.length; rowStart += 5) {
           const row = new ActionRowBuilder<ButtonBuilder>();

@@ -119,14 +119,184 @@ export function historyText(history: ChatTurn[]): string {
 }
 
 /**
+ * Escape a value for use inside a double-quoted attribute of the XML-ish
+ * prompt context, so untrusted titles cannot forge document boundaries.
+ */
+export function escapeAttribute(value: unknown): string {
+  return safeText(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
  * Render a list of Paperless documents as XML-ish context blocks for the
- * inference prompt.
+ * inference prompt. Attribute values are escaped because titles come from
+ * untrusted document metadata.
  */
 export function documentContext(documents: PaperlessDocument[]): string {
   return documents.map((d) => {
     const content = safeText(d.content).slice(0, 12_000);
-    return `<document id="${d.id}" title="${safeText(d.title)}" created="${safeText(d.created)}">\n${content}\n</document>`;
+    return `<document id="${d.id}" title="${escapeAttribute(d.title)}" created="${escapeAttribute(d.created)}">\n${content}\n</document>`;
   }).join('\n\n');
+}
+
+export interface UserRateLimiter {
+  /** Consume one unit for the key; false means the caller must back off. */
+  tryConsume(key: string): boolean;
+  /** Whole seconds until the key's window resets (0 when not limited). */
+  retryAfterSeconds(key: string): number;
+}
+
+/**
+ * Fixed-window per-user limiter for bot transports. Bounded memory: expired
+ * windows are pruned whenever the map grows past 1000 keys, which is far
+ * above any realistic allowlist size.
+ */
+export function createUserRateLimiter(
+  { windowMs, max }: { windowMs: number; max: number },
+  now: () => number = Date.now
+): UserRateLimiter {
+  const windows = new Map<string, { count: number; resetAt: number }>();
+  const entryFor = (key: string) => {
+    const current = windows.get(key);
+    if (current && current.resetAt > now()) return current;
+    const fresh = { count: 0, resetAt: now() + windowMs };
+    windows.set(key, fresh);
+    if (windows.size > 1000) {
+      for (const [storedKey, stored] of windows) {
+        if (stored.resetAt <= now()) windows.delete(storedKey);
+      }
+    }
+    return fresh;
+  };
+  return {
+    tryConsume(key: string): boolean {
+      const entry = entryFor(key);
+      if (entry.count >= max) return false;
+      entry.count += 1;
+      return true;
+    },
+    retryAfterSeconds(key: string): number {
+      const entry = windows.get(key);
+      if (!entry || entry.resetAt <= now() || entry.count < max) return 0;
+      return Math.max(1, Math.ceil((entry.resetAt - now()) / 1000));
+    },
+  };
+}
+
+/**
+ * Remove secret values (such as bot tokens) from text that is about to be
+ * logged, so transport errors cannot leak credentials into the logs.
+ */
+export function redactSecrets(text: string, secrets: string[]): string {
+  let result = text;
+  for (const secret of secrets) {
+    if (secret && secret.length >= 8) result = result.split(secret).join('[redacted]');
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Proactive action-deadline reminders (shared by Telegram and Discord)
+// ---------------------------------------------------------------------------
+
+export interface ReminderRecipient {
+  /** Transport user id (Telegram id or Discord snowflake). */
+  key: string;
+  memberId: string;
+}
+
+export interface DueReminder {
+  caseId: string;
+  title: string;
+  dueAt: string;
+  paperlessDocumentId: number | null;
+  overdue: boolean;
+}
+
+const dayOf = (value: unknown): string => safeText(value).slice(0, 10);
+
+/**
+ * Select active cases that are due within `windowDays` (or overdue) and fan
+ * them out to recipients: assigned cases go only to the assignee, unassigned
+ * cases go to every linked household member. Pure; `today` is an ISO date.
+ */
+export function collectDueReminders(
+  cases: Array<Record<string, unknown>>,
+  recipients: ReminderRecipient[],
+  today: string,
+  windowDays = 3
+): Map<string, DueReminder[]> {
+  const horizon = new Date(`${today}T00:00:00Z`);
+  horizon.setUTCDate(horizon.getUTCDate() + windowDays);
+  const horizonDay = horizon.toISOString().slice(0, 10);
+  const result = new Map<string, DueReminder[]>();
+  for (const item of cases) {
+    if (!['open', 'waiting'].includes(String(item.status))) continue;
+    const dueDay = dayOf(item.dueAt);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDay) || dueDay > horizonDay) continue;
+    const assignee = safeText(item.assigneeMemberId);
+    const targets = assignee
+      ? recipients.filter((recipient) => recipient.memberId === assignee)
+      : recipients;
+    const documentId = Number(item.paperlessDocumentId);
+    const reminder: DueReminder = {
+      caseId: safeText(item.id),
+      title: safeText(item.title),
+      dueAt: dueDay,
+      paperlessDocumentId: Number.isSafeInteger(documentId) && documentId > 0 ? documentId : null,
+      overdue: dueDay < today,
+    };
+    for (const target of targets) {
+      const list = result.get(target.key) || [];
+      list.push(reminder);
+      result.set(target.key, list);
+    }
+  }
+  return result;
+}
+
+/** Render one recipient's reminders as a single plain-text bot message. */
+export function formatReminderText(reminders: DueReminder[], today: string): string {
+  const lines = reminders.slice(0, 12).map((reminder) => {
+    const document = reminder.paperlessDocumentId ? ` [doc:${reminder.paperlessDocumentId}]` : '';
+    const when = reminder.overdue
+      ? `overdue since ${reminder.dueAt}`
+      : reminder.dueAt === today
+        ? 'due today'
+        : `due ${reminder.dueAt}`;
+    return `• ${reminder.title} — ${when}${document}`;
+  });
+  return `⏰ Household action reminders:\n${lines.join('\n')}`;
+}
+
+export interface DailyReminderTracker {
+  /** True the first time a (recipient, case, day) triple is seen. */
+  shouldSend(recipientKey: string, caseId: string, day: string): boolean;
+}
+
+/**
+ * Remember which reminders were already sent today so a 30-minute check
+ * interval produces at most one message per case, recipient, and day.
+ * In-memory by design: a restart may repeat one reminder, never lose one.
+ */
+export function createDailyReminderTracker(): DailyReminderTracker {
+  const sent = new Set<string>();
+  let currentDay = '';
+  return {
+    shouldSend(recipientKey: string, caseId: string, day: string): boolean {
+      if (day !== currentDay) {
+        sent.clear();
+        currentDay = day;
+      }
+      const key = `${recipientKey}:${caseId}`;
+      if (sent.has(key)) return false;
+      sent.add(key);
+      return true;
+    },
+  };
 }
 
 /**
