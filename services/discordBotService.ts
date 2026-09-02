@@ -37,6 +37,7 @@ import {
   ChannelType,
   Partials,
   MessageMentionOptions,
+  MessageFlags,
 } from 'discord.js';
 import axios from 'axios';
 import {
@@ -51,6 +52,12 @@ import {
   answerDocumentQuestion,
   buildActionApprovalPayload,
   classifyPaperlessUpload,
+  createUserRateLimiter,
+  collectDueReminders,
+  formatReminderText,
+  createDailyReminderTracker,
+  ReminderRecipient,
+  DueReminder,
   ChatTurn,
   PaperlessDocument,
 } from './companionBotInternals';
@@ -160,6 +167,53 @@ class DiscordBotService {
   private readonly histories = new Map<string, ChatTurn[]>();
   private homeChannelId = '';
   private running = false;
+  // Per-user flood control on the paths that reach the AI provider or move
+  // document bytes; Discord delivers events concurrently, so without this a
+  // single user could fan out parallel provider calls.
+  private readonly questionLimiter = createUserRateLimiter({ windowMs: 60_000, max: 10 });
+  private readonly uploadLimiter = createUserRateLimiter({ windowMs: 600_000, max: 6 });
+  private readonly downloadLimiter = createUserRateLimiter({ windowMs: 60_000, max: 12 });
+  private readonly reminderTracker = createDailyReminderTracker();
+  private reminderTimer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Send at most one proactive DM per case, linked user, and day for
+   * household actions that are overdue or due within the next three days.
+   */
+  private async checkActionReminders(): Promise<void> {
+    if (!this.client) return;
+    const linked = [...this.users.values()].filter((user) => user.householdId && user.memberId);
+    if (!linked.length) return;
+    const actionCenter = require('../models/actionCenter');
+    const today = new Date().toISOString().slice(0, 10);
+    const households = new Map<string, ReminderRecipient[]>();
+    for (const user of linked) {
+      const recipients = households.get(user.householdId!) || [];
+      recipients.push({ key: user.discordId, memberId: user.memberId! });
+      households.set(user.householdId!, recipients);
+    }
+    for (const [householdId, recipients] of households) {
+      let reminders: Map<string, DueReminder[]>;
+      try {
+        reminders = collectDueReminders(actionCenter.listCases(householdId), recipients, today);
+      } catch (error) {
+        console.warn(`[Discord] Reminder check failed: ${errorMessage(error)}`);
+        continue;
+      }
+      for (const [recipientKey, dueList] of reminders) {
+        const fresh = dueList.filter((reminder) => this.reminderTracker.shouldSend(recipientKey, reminder.caseId, today));
+        if (!fresh.length) continue;
+        try {
+          const recipient = await this.client.users.fetch(recipientKey);
+          for (const chunk of chunkDiscordText(formatReminderText(fresh, today))) {
+            await recipient.send({ content: chunk, allowedMentions: NO_MENTIONS });
+          }
+        } catch (error) {
+          console.warn(`[Discord] Reminder delivery failed: ${errorMessage(error)}`);
+        }
+      }
+    }
+  }
 
   start(): void {
     if (config.discord.enabled !== 'yes' || this.running) return;
@@ -253,10 +307,23 @@ class DiscordBotService {
       this.client?.destroy();
       this.client = null;
     });
+    if (config.discord.actionReminders === 'yes' && [...this.users.values()].some((user) => user.householdId && user.memberId)) {
+      this.reminderTimer = setInterval(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Discord] Reminder pass failed: ${errorMessage(error)}`));
+      }, 30 * 60 * 1000);
+      setTimeout(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Discord] Reminder pass failed: ${errorMessage(error)}`));
+      }, 30_000).unref?.();
+      this.reminderTimer.unref?.();
+    }
   }
 
   async stop(): Promise<void> {
     this.running = false;
+    if (this.reminderTimer) {
+      clearInterval(this.reminderTimer);
+      this.reminderTimer = null;
+    }
     this.histories.clear();
     if (this.client) {
       try {
@@ -435,14 +502,14 @@ class DiscordBotService {
     if (!user || (!inDm && !inHome)) {
       await interaction.reply({
         content: 'This command is not available for this user or channel.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
         allowedMentions: NO_MENTIONS,
       });
       return;
     }
 
     const histKey = this.historyKey(userId, interaction.channelId);
-    const ephemeral = inHome; // home channel replies are ephemeral
+    const flags = inHome ? MessageFlags.Ephemeral : undefined; // home channel replies are ephemeral
 
     switch (interaction.commandName) {
       case 'start':
@@ -451,7 +518,7 @@ class DiscordBotService {
             'Ask me to find or read documents in your Paperless archive, including follow-up questions. ' +
             'Send a PDF or photo to upload and classify it. Use `/clear` to forget this in-memory conversation.\n\n' +
             this.privacyText(),
-          ephemeral,
+          flags,
         });
         break;
 
@@ -459,12 +526,12 @@ class DiscordBotService {
         this.histories.delete(histKey);
         await interaction.reply({
           content: 'Conversation cleared. Nothing was stored in a database.',
-          ephemeral,
+          flags,
         });
         break;
 
       case 'privacy':
-        await interaction.reply({ content: this.privacyText(), ephemeral });
+        await interaction.reply({ content: this.privacyText(), flags });
         break;
 
       case 'actions':
@@ -472,11 +539,11 @@ class DiscordBotService {
           await interaction.reply({
             content:
               'Link this Discord user to a valid `householdId` and `memberId` in `DISCORD_USERS_JSON` to use the Action Center.',
-            ephemeral,
+            flags,
           });
           return;
         }
-        await interaction.deferReply({ ephemeral });
+        await interaction.deferReply({ flags });
         try {
           const actionCenter = require('../models/actionCenter');
           const actions = (actionCenter.listCases(user.householdId) as Record<string, unknown>[])
@@ -498,7 +565,7 @@ class DiscordBotService {
           for (const chunk of chunks.slice(1)) {
             await interaction.followUp({
               content: chunk,
-              ephemeral,
+              flags,
               allowedMentions: NO_MENTIONS,
             });
           }
@@ -508,7 +575,7 @@ class DiscordBotService {
         break;
 
       default:
-        await interaction.reply({ content: 'Unknown command.', ephemeral: true });
+        await interaction.reply({ content: 'Unknown command.', flags: MessageFlags.Ephemeral });
     }
   }
 
@@ -587,6 +654,14 @@ class DiscordBotService {
   ): Promise<void> {
     const question = cleanDiscordMention(message.content);
     if (!question) return;
+
+    if (!this.questionLimiter.tryConsume(message.author.id)) {
+      await this.sendText(
+        message.channel,
+        `You are sending questions faster than this bot allows. Try again in ${this.questionLimiter.retryAfterSeconds(message.author.id)} seconds.`
+      );
+      return;
+    }
 
     const histKey = this.historyKey(message.author.id, message.channelId);
     const history = this.histories.get(histKey) || [];
@@ -672,6 +747,14 @@ class DiscordBotService {
   ): Promise<void> {
     const attachment = message.attachments.first();
     if (!attachment) return;
+
+    if (!this.uploadLimiter.tryConsume(message.author.id)) {
+      await this.sendText(
+        message.channel,
+        `You are uploading faster than this bot allows. Try again in ${this.uploadLimiter.retryAfterSeconds(message.author.id)} seconds.`
+      );
+      return;
+    }
 
     const maxBytes = Math.min(
       Number(config.discord.maxFileBytes) || DEFAULT_MAX_FILE_BYTES,
@@ -793,7 +876,7 @@ class DiscordBotService {
     if (!user || (!inDm && !inHome)) {
       await interaction.reply({
         content: 'You are not authorized to use this button.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -808,18 +891,18 @@ class DiscordBotService {
       if (originator !== userId) {
         await interaction.reply({
           content: 'This approval button belongs to another user.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
       if (!user.householdId || !user.memberId) {
         await interaction.reply({
           content: 'Approval requires a linked household account.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
-      await interaction.deferReply({ ephemeral: inHome });
+      await interaction.deferReply({ flags: inHome ? MessageFlags.Ephemeral : undefined });
       try {
         const actionCenter = require('../models/actionCenter');
         const decision = approvalMatch[1] === 'approve' ? 'approved' : 'rejected';
@@ -858,13 +941,20 @@ class DiscordBotService {
       if (originator !== userId) {
         await interaction.reply({
           content: 'This download button belongs to another user.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      if (!this.downloadLimiter.tryConsume(userId)) {
+        await interaction.reply({
+          content: `You are downloading documents faster than this bot allows. Try again in ${this.downloadLimiter.retryAfterSeconds(userId)} seconds.`,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
       const documentId = Number(docMatch[1]);
       // Home channel downloads must be ephemeral
-      await interaction.deferReply({ ephemeral: inHome });
+      await interaction.deferReply({ flags: inHome ? MessageFlags.Ephemeral : undefined });
       try {
         const file = await this.paperlessFor(user).downloadDocument(documentId);
         const maxDownloadBytes = Math.min(
@@ -894,7 +984,7 @@ class DiscordBotService {
       return;
     }
 
-    await interaction.reply({ content: 'Unknown button action.', ephemeral: true });
+    await interaction.reply({ content: 'Unknown button action.', flags: MessageFlags.Ephemeral });
   }
 
   // -------------------------------------------------------------------------
@@ -956,8 +1046,9 @@ class DiscordBotService {
       const components: ActionRowBuilder<ButtonBuilder>[] = [];
 
       if (isLast && documents.length) {
-        // Up to 5 document buttons per row, up to 5 rows (25 total), but we cap at 8
-        const capped = documents.slice(0, Number(config.discord.maxDocuments) || 8);
+        // Up to 5 document buttons per row; Discord rejects messages with more
+        // than 5 action rows, so cap at 25 regardless of DISCORD_MAX_DOCUMENTS.
+        const capped = documents.slice(0, Math.min(Number(config.discord.maxDocuments) || 8, 25));
         // Build rows of up to 5 buttons
         for (let rowStart = 0; rowStart < capped.length; rowStart += 5) {
           const row = new ActionRowBuilder<ButtonBuilder>();

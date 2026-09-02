@@ -9,6 +9,61 @@ export type ChangelogEntry = {
 
 export const changelogEntries: ChangelogEntry[] = [
   {
+    version: '3.4.0',
+    date: '2 September 2026',
+    title: 'Action Center focus, proactive bots and Paperless API pin',
+    summary: 'Tagvico leads with cases, households and approvals, makes both family bots proactive and hardened, and pins the Paperless-ngx API version.',
+    status: 'released',
+    groups: [
+      {
+        title: 'Product focus',
+        items: [
+          'Positioning now leads with the Action Center and Household Companion; AI metadata filing stays fully supported as an opt-in included utility.',
+          'Documented coexistence with native Paperless-ngx v3 AI suggestions: never two automatic writers on the same fields.',
+          'OCR rescue, the Codex and Copilot subscription adapters and OpenAI Flex/Batch modes enter maintenance mode for the rest of v3.'
+        ]
+      },
+      {
+        title: 'Family bots',
+        items: [
+          'Linked household members receive proactive reminders for actions that are overdue or due within three days, at most once per case, user and day.',
+          'Per-user flood limits on questions, uploads and downloads; document titles are escaped before entering the model prompt; bot tokens never reach the logs.'
+        ]
+      },
+      {
+        title: 'Paperless-ngx compatibility',
+        items: [
+          'Every Paperless request now pins REST API version 9, which Paperless-ngx 2.16 through 3.x all serve, instead of following the server default that changed in Paperless-ngx 3.',
+          'Setup reports clearly when a Paperless-ngx instance is older than the supported 2.16 minimum.'
+        ]
+      }
+    ]
+  },
+  {
+    version: '3.3.0',
+    date: '27 August 2026',
+    title: 'Discord companion bot and Paperless discovery',
+    summary: 'The household companion arrives on Discord and first-run setup can find Paperless-ngx on its own.',
+    status: 'released',
+    groups: [
+      {
+        title: 'Discord companion bot',
+        items: [
+          'Optional Discord bot with full Telegram parity: cited document answers, single-attachment uploads, action listing and approve/reject buttons.',
+          'Every allowlisted Discord user brings their own Paperless token; foreign or replayed button interactions are rejected.',
+          'Direct messages plus one optional home channel where only slash commands, mentions and replies are processed, without the privileged Message Content intent.'
+        ]
+      },
+      {
+        title: 'First-run setup',
+        items: [
+          'Scan for Paperless searches the attached networks, including Docker bridge networks, for a running Paperless-ngx instance and fills the Base URL.',
+          'The public landing page uses self-hosted, cookie-free analytics; the application and bundled docs stay telemetry-free apart from the opt-in aggregate heartbeat.'
+        ]
+      }
+    ]
+  },
+  {
     version: '3.2.6',
     date: '30 July 2026',
     title: 'Safer deployment and verified metrics',
@@ -211,4 +266,4 @@ export const changelogEntries: ChangelogEntry[] = [
   }
 ];
 
-export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.2.6')!;
+export const currentChangelogAnnouncement = changelogEntries.find((entry) => entry.version === '3.4.0')!;

@@ -1,5 +1,6 @@
 // services/paperlessService.js
 import axios from 'axios';
+import { PAPERLESS_ACCEPT } from './paperlessApi';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const config = require('../config/config');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -58,6 +59,7 @@ class PaperlessService {
         timeout: PAPERLESS_REQUEST_TIMEOUT_MS,
         headers: {
           'Authorization': `Token ${config.paperless.apiToken}`,
+          Accept: PAPERLESS_ACCEPT,
           'Content-Type': 'application/json'
         }
       });
@@ -174,13 +176,16 @@ class PaperlessService {
       timeout: PAPERLESS_REQUEST_TIMEOUT_MS,
       headers: {
         'Authorization': `Token ${apiToken}`,
+        Accept: PAPERLESS_ACCEPT,
         'Content-Type': 'application/json'
       }
     });
     
-    // Test the connection
+    // Test the connection against a versioned, authenticated endpoint. The API
+    // root redirects to the HTML schema view, which rejects a strict versioned
+    // Accept header with 406 and would report a healthy instance as broken.
     try {
-      await this.client.get('/');
+      await this.client.get('/ui_settings/');
       return true;
     } catch (error) {
       console.error('[ERROR] Failed to initialize with credentials:', errorMessage(error));
@@ -787,7 +792,7 @@ class PaperlessService {
         const params: Record<string, string | number> = {
           page,
           page_size: 100,
-          fields: 'id,title,created,created_date,added,tags,correspondent'
+          fields: 'id,title,created,added,tags,correspondent'
         };
 
         // Füge Tag-Filter hinzu, wenn Tags definiert sind

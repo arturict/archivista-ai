@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import axios from 'axios';
+import { PAPERLESS_ACCEPT } from './paperlessApi';
 import * as actionCenter from '../models/actionCenter';
 import { decryptSecret } from './secretBox';
 import { runtimeEnvironmentValue } from './runtimeEnvironment';
@@ -32,7 +33,7 @@ function paperlessClient(token: string) {
     baseURL: apiUrl,
     timeout: 30_000,
     maxContentLength: MAX_PAPERLESS_JSON_BYTES,
-    headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' }
+    headers: { Authorization: `Token ${token}`, Accept: PAPERLESS_ACCEPT, 'Content-Type': 'application/json' }
   });
 }
 

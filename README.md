@@ -10,7 +10,12 @@ or [report a reproducible bug](https://github.com/arturict/tagvico-ai/issues/new
 **The private Action Center and Household Companion for Paperless-ngx.** Turn
 letters and PDFs into assigned deadlines, decisions, payments, replies,
 renewals, and multi-step work while keeping Paperless as the document system of
-record. Reviewable AI metadata automation remains included.
+record. Paperless files the document; Tagvico makes sure someone acts on it.
+
+Reviewable AI metadata filing is still included as an opt-in utility — and if
+you use Paperless-ngx v3's built-in AI suggestions instead, Tagvico steps aside
+and focuses on the action layer. See
+[Tagvico and native Paperless-ngx AI](#tagvico-and-native-paperless-ngx-ai).
 
 [![Status: stable v3](https://img.shields.io/badge/status-stable_v3-16a34a.svg)](docs/STATUS.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -22,15 +27,15 @@ record. Reviewable AI metadata automation remains included.
 ## Why Tagvico
 
 - **Action Cases, not loose reminders** — one case per Paperless document, with priority, owner, due date, audit trail, and up to 100 checklist steps.
+- **A household, not a single user** — assign work to family members, with roles that decide who may approve what.
 - **AI with approval boundaries** — the Companion can read permitted documents and prepare changes; only an owner or adult can execute a write.
 - **Your choice of model** — the Companion uses Vercel AI SDK v6 for OpenCode Go, OpenRouter, OpenAI, and compatible gateways, plus an optional read-only Codex SDK adapter.
-- **Useful metadata, automatically** — retain titles, tags, correspondents, document types, dates, languages, custom fields, and optional owner assignment.
-- **Cost-aware processing** — pick immediate requests, OpenAI Flex, or asynchronous OpenAI batches.
+- **Optional Telegram and Discord access** — allowlisted family members can search, upload, list actions, and approve or reject proposals using their own Paperless tokens.
 - **Designed for homelabs** — one container, one persistent volume, and SQLite for processing history and retries.
-- **Optional Telegram access** — allowlisted family members can search, upload, list actions, and approve or reject proposals using their own Paperless tokens.
 - **Built to recover** — durable OCR and terminal-failure queues, safe rescans, original-metadata restore, and interrupted-job recovery.
 - **Operationally hardened** — optional MFA, rate limits, same-origin mutation checks, protected setup, and generated JWT secrets.
 - **Clear privacy boundaries** — keep processing on your network with a local endpoint, or explicitly choose a hosted provider.
+- **Included utility: reviewable metadata filing** — opt-in AI suggestions for titles, tags, correspondents, types, dates, custom fields, and owners, with a review queue, cost-aware OpenAI Flex/Batch modes, and full restore snapshots. Useful on Paperless-ngx 2.x, or whenever you want an approval gate and audit trail that native suggestions don't provide.
 
 ## The v3 architecture
 
@@ -39,6 +44,42 @@ tool catalog, household roles, approval state, and audit trail. Model providers
 only supply inference. There is no shell or filesystem tool in the Companion.
 Top-level case state is mirrored to reserved Paperless custom fields and the
 `tagvico/action` tag; complete checklists remain local to Tagvico.
+
+## Tagvico and native Paperless-ngx AI
+
+Paperless-ngx v3 ships its own AI: metadata suggestions, an apply-suggestions
+workflow action, and document chat. That's good news — it covers the routine
+tagging Tagvico automated in v1 and v2, and Tagvico does not compete with it.
+
+- **Deadlines, cases, households, approvals, and the family bots** are
+  Tagvico's job. Paperless-ngx is a document archive by design and has no
+  equivalent layer.
+- **Metadata filing is yours to place.** Use native Paperless AI, or use
+  Tagvico's opt-in filing when you want a review queue, an approval gate,
+  restore snapshots, provider choice, or you're still on Paperless-ngx 2.x.
+- **Do not run two writers.** If Paperless AI workflow actions apply metadata
+  automatically, leave Tagvico's metadata automation off or in **Review
+  first** — never both in Automatic. Two automations editing the same fields
+  will fight, and the audit trail stops being trustworthy.
+
+New Tagvico installations already start with scheduled scans paused and writes
+in Review first, so native Paperless AI and a default Tagvico setup coexist
+safely out of the box.
+
+## What Tagvico doesn't do
+
+Stated non-goals build more trust than feature lists. Tagvico deliberately:
+
+- **doesn't store your documents** — Paperless-ngx keeps the files; Tagvico keeps cases, approvals, and history.
+- **doesn't replace Paperless** — search, storage, permissions, and native AI stay Paperless's job, accessed only through the official REST API.
+- **doesn't give models shell or filesystem access** — the Companion has a narrow tool catalog, and every write needs an approval or an explicitly chosen automatic mode.
+- **doesn't phone home by default** — analytics are opt-in, previewable, and content-free.
+- **doesn't require the cloud** — one container next to your Paperless, with local inference if you want it.
+
+Some v2-era features (OCR rescue, the ChatGPT-subscription and Copilot
+adapters, OpenAI Flex/Batch modes) are now in maintenance mode: fully
+supported throughout v3, but candidates for removal in v4 as Tagvico focuses
+on the action layer. See [docs/v4-plan.md](docs/v4-plan.md).
 
 ## See Tagvico in action
 
@@ -62,7 +103,7 @@ which account-scoped model is active, and which vocabulary the model may use.
 
 <p align="center"><em>Sanitized v3.2 screens from a representative installation. No document contents, credentials, endpoints, or account identifiers are shown.</em></p>
 
-## Stable quick start (v3.2.6)
+## Stable quick start (v3.4.0)
 
 Use only immutable tags that are present on the
 [GitHub releases page](https://github.com/arturict/tagvico-ai/releases).
@@ -76,7 +117,7 @@ services:
   tagvico-ai:
     # Pin an immutable release tag for upgrades you can rely on.
     # See https://github.com/arturict/tagvico-ai/releases for the current version.
-    image: ghcr.io/arturict/tagvico-ai:3.2.6
+    image: ghcr.io/arturict/tagvico-ai:3.4.0
     container_name: tagvico-ai
     restart: unless-stopped
     cap_drop:
@@ -139,7 +180,7 @@ docker run -d \
   -e TAGVICO_AI_BIND_ADDRESS=127.0.0.1 \
   -e TAGVICO_TELEMETRY_ENDPOINT=https://telemetry.tagvico.arturf.ch/v1/heartbeat \
   -v tagvico_ai_data:/app/data \
-  ghcr.io/arturict/tagvico-ai:3.2.6
+  ghcr.io/arturict/tagvico-ai:3.4.0
 ```
 
 For remote setup, replace the published address with
@@ -153,7 +194,9 @@ locked-down default.
 
 ## How it works
 
-Tagvico polls Paperless-ngx for new documents, reads their OCR text and existing metadata, and asks the configured model for a structured filing suggestion. In **Review first** mode, suggestions wait in the durable Review queue until you apply or reject them. In **Automatic** mode, validated values are written directly to the original document. Existing queued suggestions always remain reviewable when you switch modes. Processing history, token metrics, retries, and manual re-runs are available in the web UI.
+The core loop is the Action Center: you (or the Companion, or a family member through Telegram or Discord) turn a Paperless document into an Action Case with an owner, a due date, and checklist steps. The Companion can research permitted documents and prepare changes, but every write becomes a durable proposal that an owner or adult must approve; a deterministic executor then applies it and records the audit trail. Case state is mirrored back to Paperless custom fields so the archive stays the system of record.
+
+The optional metadata filing utility works alongside this: when enabled, Tagvico polls Paperless-ngx for new documents, reads their OCR text and existing metadata, and asks the configured model for a structured filing suggestion. In **Review first** mode, suggestions wait in the durable Review queue until you apply or reject them. In **Automatic** mode, validated values are written directly to the original document. Existing queued suggestions always remain reviewable when you switch modes. Processing history, token metrics, retries, and manual re-runs are available in the web UI.
 
 Owner matching is conservative: optional hint profiles add context, and assignment only happens when the model output agrees with the available Paperless user information.
 
@@ -210,8 +253,16 @@ Set `TELEGRAM_BOT_ENABLED=yes`, provide a BotFather token in
 TELEGRAM_USERS_JSON=[{"telegramId":"123456789","paperlessToken":"token-for-that-user"}]
 ```
 
-Unknown users and non-private chats are ignored. Conversation history is
-bounded, kept in memory per user, and cleared by `/clear` or a restart. Search,
+Unknown users and non-private chats are ignored. Each user is flood-limited
+(10 questions/minute, 6 uploads/10 minutes, 12 downloads/minute), so a lost
+or compromised phone cannot run up provider costs. Conversation history is
+bounded, kept in memory per user, and cleared by `/clear` or a restart.
+
+Users linked to the Action Center via `householdId`/`memberId` also receive
+proactive DM reminders for household actions that are overdue or due within
+three days — assigned cases go to the assignee, unassigned cases to every
+linked member, at most one message per case, user, and day. Set
+`TELEGRAM_ACTION_REMINDERS=no` to disable. Search,
 downloads, and uploads use the matching user's Paperless token, so Paperless
 remains the permission authority. Set
 `TELEGRAM_UPLOAD_AUTOMATIC_METADATA=yes` only if Telegram uploads may bypass
@@ -257,7 +308,11 @@ then right-click a user and choose **Copy User ID**. Right-click the chosen
 channel and choose **Copy Channel ID** for `DISCORD_HOME_CHANNEL_ID`.
 
 Conversation history is bounded, kept in memory per Discord user and channel,
-and cleared by `/clear` or a restart. Search, downloads, and uploads use the
+and cleared by `/clear` or a restart. Each user is flood-limited
+(10 questions/minute, 6 uploads/10 minutes, 12 downloads/minute). Users
+linked via `householdId`/`memberId` also receive proactive DM reminders for
+household actions that are overdue or due within three days (one message per
+case, user, and day); set `DISCORD_ACTION_REMINDERS=no` to disable. Search, downloads, and uploads use the
 matching user's Paperless token, so Paperless remains the permission authority.
 
 Document download and approval buttons are bound to the originating Discord
@@ -289,7 +344,7 @@ Activity supports single and bulk rescan, exact restoration of the first metadat
 ## Upgrades
 
 1. Check the latest release at <https://github.com/arturict/tagvico-ai/releases>.
-2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page, for example `ghcr.io/arturict/tagvico-ai:3.2.6`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
+2. Update the image tag in `docker-compose.yml` to the new **immutable version tag** shown on the releases page, for example `ghcr.io/arturict/tagvico-ai:3.4.0`. Avoid `:latest` in production: it makes rollback ambiguous and can pull a breaking change unexpectedly.
 3. `docker compose pull && docker compose up -d`.
 
 The container is replaceable, while configuration, processing history, the local admin account, encrypted member tokens, and the installation secret live in the `tagvico_ai_data` volume. Back up and restore that volume as one unit; changing or losing the JWT secret makes encrypted member tokens unreadable.

@@ -7,6 +7,7 @@
 // before we issue a PATCH.
 
 import axios from 'axios';
+import { PAPERLESS_ACCEPT } from './paperlessApi';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const config = require('../config/config');
 
@@ -52,6 +53,7 @@ function buildClient(paperlessUrl: string, token: string) {
     baseURL: paperlessUrl,
     headers: {
       Authorization: `Token ${token}`,
+      Accept: PAPERLESS_ACCEPT,
       'Content-Type': 'application/json'
     }
   });

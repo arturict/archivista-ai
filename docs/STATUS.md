@@ -1,15 +1,15 @@
 # Project status
 
-**Status:** stable v3. The latest stable patch is `3.2.6`.
+**Status:** stable v3. The latest stable release is `3.4.0`.
 
 ## Stable v3 contract
 
 Tagvico AI v3.0.0 established the accountable action and approval layer for the
-stable, reviewable Paperless-ngx workflow. The current v3.2.6 release adds
-secure local deployment defaults and a verified aggregate-metrics receiver to
-the v3.2.5 first-run, source-backed answer, recovery, and responsive-product
-work without changing the v3 compatibility contract. The following are
-commitments for the complete v3 release line:
+stable, reviewable Paperless-ngx workflow. The current v3.4.0 release
+repositions the product around the Action Center, adds the Discord companion
+bot, makes both family bots proactive and hardened, and pins the Paperless-ngx
+REST API version, without changing the v3 compatibility contract. The
+following are commitments for the complete v3 release line:
 
 - Existing v2 and v3 data volumes are upgraded with versioned, idempotent SQLite
   migrations and a pre-migration database backup.
@@ -19,10 +19,19 @@ commitments for the complete v3 release line:
 - Stable upgrades do not intentionally discard the local admin account,
   settings, processing history, review queue, or original metadata snapshots.
 - Paperless data is accessed only through the official Paperless REST API.
+  Since v3.4.0 every request pins REST API version 9, which Paperless-ngx
+  2.16 through 3.x serve; the supported minimum is therefore Paperless-ngx
+  2.16.0. Setup reports older instances explicitly.
 
 The household, Action Case, checklist, approval, and encrypted member-token
 records introduced by schema v5 are also preserved through compatible v3
 upgrades. Breaking changes to these contracts require a new major version.
+
+As of v3.4.0, OCR rescue, the ChatGPT-subscription (Codex) adapter, the
+GitHub Copilot adapter, and OpenAI Flex/Batch modes are in **maintenance
+mode**: they remain fully supported and receive bug and security fixes for
+the entire v3 line, but gain no new capabilities and are removal candidates
+for v4. See [`v4-plan.md`](v4-plan.md).
 Provider model names, prices, quotas, and account entitlements remain controlled
 by the provider and can change independently of Tagvico.
 

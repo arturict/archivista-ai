@@ -317,7 +317,8 @@ test('Compose passes every Telegram setting through with automatic metadata off 
     TELEGRAM_MAX_DOCUMENTS: '8',
     TELEGRAM_HISTORY_TURNS: '6',
     TELEGRAM_MAX_FILE_BYTES: '20971520',
-    TELEGRAM_UPLOAD_AUTOMATIC_METADATA: 'no'
+    TELEGRAM_UPLOAD_AUTOMATIC_METADATA: 'no',
+    TELEGRAM_ACTION_REMINDERS: 'yes'
   };
   for (const [name, fallback] of Object.entries(expected)) {
     assert.match(compose, new RegExp(`${name}: \\${'${'}${name}:-${fallback.replace(/[\\[\]]/g, '\\$&')}\\}`));

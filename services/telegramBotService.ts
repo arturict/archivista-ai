@@ -13,6 +13,13 @@ import {
   answerDocumentQuestion,
   buildActionApprovalPayload,
   classifyPaperlessUpload,
+  createUserRateLimiter,
+  redactSecrets,
+  collectDueReminders,
+  formatReminderText,
+  createDailyReminderTracker,
+  ReminderRecipient,
+  DueReminder,
   ChatTurn as BotChatTurn,
 } from './companionBotInternals';
 
@@ -111,6 +118,50 @@ class TelegramBotService {
   private loopPromise: Promise<void> | null = null;
   private botToken = '';
   private apiBase = '';
+  // Per-user flood control on the paths that reach the AI provider or move
+  // document bytes; a stolen family phone must not be able to run up costs.
+  private readonly questionLimiter = createUserRateLimiter({ windowMs: 60_000, max: 10 });
+  private readonly uploadLimiter = createUserRateLimiter({ windowMs: 600_000, max: 6 });
+  private readonly downloadLimiter = createUserRateLimiter({ windowMs: 60_000, max: 12 });
+  private readonly reminderTracker = createDailyReminderTracker();
+  private reminderTimer: ReturnType<typeof setInterval> | null = null;
+
+  private safeError(error: unknown): string {
+    return redactSecrets(errorMessage(error), [this.botToken]);
+  }
+
+  /**
+   * Send at most one proactive DM per case, linked user, and day for
+   * household actions that are overdue or due within the next three days.
+   */
+  private async checkActionReminders(): Promise<void> {
+    const linked = [...this.users.values()].filter((user) => user.householdId && user.memberId);
+    if (!linked.length) return;
+    const actionCenter = require('../models/actionCenter');
+    const today = new Date().toISOString().slice(0, 10);
+    const households = new Map<string, ReminderRecipient[]>();
+    for (const user of linked) {
+      const recipients = households.get(user.householdId!) || [];
+      recipients.push({ key: user.telegramId, memberId: user.memberId! });
+      households.set(user.householdId!, recipients);
+    }
+    for (const [householdId, recipients] of households) {
+      let reminders: Map<string, DueReminder[]>;
+      try {
+        reminders = collectDueReminders(actionCenter.listCases(householdId), recipients, today);
+      } catch (error) {
+        console.warn(`[Telegram] Reminder check failed: ${this.safeError(error)}`);
+        continue;
+      }
+      for (const [recipientKey, dueList] of reminders) {
+        const fresh = dueList.filter((reminder) => this.reminderTracker.shouldSend(recipientKey, reminder.caseId, today));
+        if (!fresh.length) continue;
+        await this.sendText(Number(recipientKey), formatReminderText(fresh, today)).catch((error) =>
+          console.warn(`[Telegram] Reminder delivery failed: ${this.safeError(error)}`)
+        );
+      }
+    }
+  }
 
   start(): void {
     if (config.telegram.enabled !== 'yes' || this.running) return;
@@ -152,11 +203,24 @@ class TelegramBotService {
         { command: 'privacy', description: 'Show data-processing information' }
       ]
     }).catch(() => {});
+    if (config.telegram.actionReminders === 'yes' && [...this.users.values()].some((user) => user.householdId && user.memberId)) {
+      this.reminderTimer = setInterval(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Telegram] Reminder pass failed: ${this.safeError(error)}`));
+      }, 30 * 60 * 1000);
+      setTimeout(() => {
+        void this.checkActionReminders().catch((error) => console.warn(`[Telegram] Reminder pass failed: ${this.safeError(error)}`));
+      }, 30_000).unref?.();
+      this.reminderTimer.unref?.();
+    }
     console.log(`[Telegram] Bot started for ${this.users.size} allowlisted user(s)`);
   }
 
   async stop(): Promise<void> {
     this.running = false;
+    if (this.reminderTimer) {
+      clearInterval(this.reminderTimer);
+      this.reminderTimer = null;
+    }
     this.pollingController?.abort();
     await this.loopPromise?.catch(() => {});
     this.loopPromise = null;
@@ -202,7 +266,7 @@ class TelegramBotService {
         for (const update of updates) {
           this.offset = Math.max(this.offset, update.update_id + 1);
           await this.handleUpdate(update).catch(async (error) => {
-            console.warn(`[Telegram] Update failed: ${errorMessage(error)}`);
+            console.warn(`[Telegram] Update failed: ${this.safeError(error)}`);
             const chatId = update.message?.chat.id || update.callback_query?.message?.chat.id;
             const user = this.userFor(update.message?.from?.id || update.callback_query?.from.id);
             if (chatId && user) await this.sendText(chatId, 'I could not complete that request. Check the Tagvico logs for the provider or Paperless error.').catch(() => {});
@@ -210,7 +274,7 @@ class TelegramBotService {
         }
       } catch (error) {
         if (!this.running) break;
-        console.warn(`[Telegram] Polling failed; retrying: ${errorMessage(error)}`);
+        console.warn(`[Telegram] Polling failed; retrying: ${this.safeError(error)}`);
         await sleep(failureDelay);
         failureDelay = Math.min(failureDelay * 2, 30_000);
       } finally {
@@ -259,6 +323,10 @@ class TelegramBotService {
   }
 
   private async handleQuestion(message: TelegramMessage, user: TelegramUserConfig): Promise<void> {
+    if (!this.questionLimiter.tryConsume(user.telegramId)) {
+      await this.sendText(message.chat.id, `You are sending questions faster than this bot allows. Try again in ${this.questionLimiter.retryAfterSeconds(user.telegramId)} seconds.`);
+      return;
+    }
     const question = safeText(message.text);
     const history = this.histories.get(user.telegramId) || [];
     await this.call('sendChatAction', { chat_id: message.chat.id, action: 'typing' });
@@ -299,16 +367,25 @@ class TelegramBotService {
     await this.call('answerCallbackQuery', { callback_query_id: callback.id });
     const approvalMatch = safeText(callback.data).match(/^approval:(approve|reject):([0-9a-f-]{36})$/i);
     if (approvalMatch && user.householdId && user.memberId) {
-      const actionCenter = require('../models/actionCenter');
-      const decision = approvalMatch[1] === 'approve' ? 'approved' : 'rejected';
-      actionCenter.decideApproval(user.householdId, approvalMatch[2], user.memberId, decision);
-      const result = decision === 'approved' ? await require('./approvalExecutor').executeApproval(user.householdId, approvalMatch[2], user.memberId) : null;
-      const syncFailed = result?.result?.sync?.ok === false;
-      await this.sendText(chatId, decision === 'approved' ? (syncFailed ? 'Approved and saved locally. Paperless sync failed and will retry automatically.' : 'Approved and synced with Paperless.') : 'Proposal rejected.');
+      try {
+        const actionCenter = require('../models/actionCenter');
+        const decision = approvalMatch[1] === 'approve' ? 'approved' : 'rejected';
+        actionCenter.decideApproval(user.householdId, approvalMatch[2], user.memberId, decision);
+        const result = decision === 'approved' ? await require('./approvalExecutor').executeApproval(user.householdId, approvalMatch[2], user.memberId) : null;
+        const syncFailed = result?.result?.sync?.ok === false;
+        await this.sendText(chatId, decision === 'approved' ? (syncFailed ? 'Approved and saved locally. Paperless sync failed and will retry automatically.' : 'Approved and synced with Paperless.') : 'Proposal rejected.');
+      } catch (error) {
+        console.warn(`[Telegram] Approval decision failed: ${this.safeError(error)}`);
+        await this.sendText(chatId, 'This proposal is no longer pending or could not be processed.');
+      }
       return;
     }
     const match = safeText(callback.data).match(/^doc:(\d+)$/);
     if (!match) return;
+    if (!this.downloadLimiter.tryConsume(user.telegramId)) {
+      await this.sendText(chatId, `You are downloading documents faster than this bot allows. Try again in ${this.downloadLimiter.retryAfterSeconds(user.telegramId)} seconds.`);
+      return;
+    }
     const documentId = Number(match[1]);
     await this.call('sendChatAction', { chat_id: chatId, action: 'upload_document' });
     const file = await this.paperlessFor(user).downloadDocument(documentId);
@@ -323,6 +400,10 @@ class TelegramBotService {
     const photo = message.photo?.[message.photo.length - 1];
     const source = message.document || photo;
     if (!source) return;
+    if (!this.uploadLimiter.tryConsume(user.telegramId)) {
+      await this.sendText(message.chat.id, `You are uploading faster than this bot allows. Try again in ${this.uploadLimiter.retryAfterSeconds(user.telegramId)} seconds.`);
+      return;
+    }
     if (source.file_size && source.file_size > Number(config.telegram.maxFileBytes)) {
       await this.sendText(message.chat.id, 'Telegram bots can download files up to 20 MB. Send a smaller file or upload it in Paperless.');
       return;
@@ -372,7 +453,7 @@ class TelegramBotService {
       this.ai(),
       paperless,
       documentId,
-      (error) => console.warn(`[Telegram] Document note was not added: ${errorMessage(error)}`)
+      (error) => console.warn(`[Telegram] Document note was not added: ${this.safeError(error)}`)
     );
   }
 

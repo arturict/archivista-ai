@@ -1,5 +1,69 @@
 # Changelog
 
+## 3.4.0 - 2026-09-02
+
+### Product direction and v4 preparation
+
+- Tagvico's positioning now leads with the Action Center and Household
+  Companion. AI metadata filing remains fully supported but is presented as an
+  included, opt-in utility, and the documentation explains how to coexist with
+  Paperless-ngx v3's native AI suggestions (never two automatic writers on the
+  same fields).
+- The following features enter **maintenance mode** for the remainder of v3:
+  OCR rescue, the ChatGPT-subscription (Codex) adapter, the GitHub Copilot
+  adapter, and OpenAI Flex/Batch processing modes. They keep working and keep
+  receiving bug fixes, but no new capabilities, and they are candidates for
+  removal in v4. See `docs/v4-plan.md` for the rationale and migration paths.
+
+### Paperless-ngx compatibility
+
+- Every Paperless request now sends `Accept: application/json; version=9`
+  instead of following the server default. Paperless-ngx 2.16 through 2.20
+  default to version 9, but Paperless-ngx 3.x defaults to version 10, which
+  paginates the task list, renames task fields, and deprecates the `all`
+  parameter; pinning keeps document, task, and custom-field payloads
+  identical on both lines. The supported minimum is now Paperless-ngx
+  2.16.0, and setup reports a 406 from an older instance in plain words.
+- The deprecated `created_date` field is no longer requested during scans.
+- The Discord bot uses `MessageFlags.Ephemeral` instead of the deprecated
+  `ephemeral` interaction option, removing runtime deprecation warnings on
+  discord.js 14.27.
+- Dependency audit is clean again (`browserslist` advisory resolved).
+
+### Proactive action reminders (Telegram and Discord)
+
+- Bot users linked to the Action Center now receive proactive DM reminders
+  for household actions that are overdue or due within the next three days.
+  Assigned cases go only to the assignee; unassigned cases go to every linked
+  household member. At most one message per case, user, and day; checks run
+  every 30 minutes in-process. Disable with `TELEGRAM_ACTION_REMINDERS=no` /
+  `DISCORD_ACTION_REMINDERS=no`.
+
+### Bot hardening (Telegram and Discord)
+
+- Per-user flood control on every path that reaches the AI provider or moves
+  document bytes: 10 questions per minute, 6 uploads per 10 minutes, and 12
+  document downloads per minute per allowlisted user. Excess requests get a
+  polite retry-after reply instead of running up provider costs.
+- Untrusted document titles and dates are now escaped before being embedded
+  in the model prompt context, so a crafted title can no longer forge document
+  boundaries in the research prompt.
+- Telegram transport errors are scrubbed of the bot token before logging.
+- Telegram approval buttons now report "no longer pending" gracefully instead
+  of a generic failure when a proposal was already decided (Discord parity).
+- Discord document buttons are hard-capped at 25 (five rows of five), so an
+  oversized `DISCORD_MAX_DOCUMENTS` can no longer produce a message the
+  Discord API rejects.
+
+### Upgrade note
+
+- Back up `tagvico_ai_data`, pull the pinned `3.4.0` image, and recreate only
+  the Tagvico container. This release does not change the data schema.
+  Paperless-ngx 2.16.0 or newer is required from this release on. Linked bot
+  users receive proactive action reminders unless
+  `TELEGRAM_ACTION_REMINDERS=no` / `DISCORD_ACTION_REMINDERS=no` is set.
+
+
 ## 3.3.0 - 2026-08-27
 
 ### Discord companion bot
