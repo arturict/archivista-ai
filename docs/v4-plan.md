@@ -24,7 +24,7 @@ disproportionate maintenance.
 - Households, roles, and the approval boundary with the deterministic
   executor.
 - Ask Tagvico research with visible tool activity.
-- **Telegram and Discord bots — both are core surfaces.** v3.3.0 already adds
+- **Telegram and Discord bots — both are core surfaces.** v3.4.0 already adds
   per-user flood control, prompt-context escaping, token-redacted logs, and
   Discord button caps; further polish continues.
 - The review queue, restore snapshots, and processing history.
@@ -50,7 +50,7 @@ Reviewed 2026-09 against [OpenClaw](https://github.com/openclaw/openclaw) and
 open-source chat-assistant gateways. Adopted, planned, and explicitly
 rejected ideas:
 
-**Shipped in v3.3.0:** proactive action-deadline reminders (their
+**Shipped in v3.4.0:** proactive action-deadline reminders (their
 heartbeat/cron-delivery pattern, translated to Action Case due dates).
 
 **Planned, in priority order:**
@@ -87,7 +87,7 @@ Paperless and the Action Center, not general agents.
 2. **Paperless v3 compatibility work lands first** (E2E stack against
    Paperless 3.x, drop `created_date`, pin an API version) so v4 starts from
    a verified baseline.
-3. **Native-AI coexistence** ships as documentation in v3.3 and ideally as
+3. **Native-AI coexistence** ships as documentation in v3.4 and ideally as
    in-app detection before v4.
 
 ## Explicit non-goals (all majors)

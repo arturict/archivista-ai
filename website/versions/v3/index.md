@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: "Tagvico v3.2"
+  name: "Tagvico v3.4"
   text: "The Action Center for Paperless-ngx"
   tagline: Paperless files it — Tagvico makes sure someone acts on it. Deadlines, households, approvals, and research with every sensitive change visible.
   image:
@@ -10,7 +10,7 @@ hero:
     alt: Tagvico AI
   actions:
     - theme: brand
-      text: Install v3.2.6
+      text: Install v3.4.0
       link: /installation
     - theme: alt
       text: Explore features
@@ -55,10 +55,10 @@ coexistence guidance.
 
 This page tracks the latest stable v3 patch release. The version menu keeps
 older major-version guides available, while [Release notes](./release-notes)
-shows exactly what changed in v3.2.
+shows exactly what changed in v3.4.
 
 ::: tip Production defaults
-Pin the immutable `3.2.6` image, back up the data volume before upgrades, and start new installations in
+Pin the immutable `3.4.0` image, back up the data volume before upgrades, and start new installations in
 **Review first** mode. Companion writes are always approval-gated regardless
 of the metadata processing mode.
 :::
