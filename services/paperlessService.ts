@@ -181,9 +181,11 @@ class PaperlessService {
       }
     });
     
-    // Test the connection
+    // Test the connection against a versioned, authenticated endpoint. The API
+    // root redirects to the HTML schema view, which rejects a strict versioned
+    // Accept header with 406 and would report a healthy instance as broken.
     try {
-      await this.client.get('/');
+      await this.client.get('/ui_settings/');
       return true;
     } catch (error) {
       console.error('[ERROR] Failed to initialize with credentials:', errorMessage(error));
