@@ -37,6 +37,7 @@ import {
   ChannelType,
   Partials,
   MessageMentionOptions,
+  MessageFlags,
 } from 'discord.js';
 import axios from 'axios';
 import {
@@ -501,14 +502,14 @@ class DiscordBotService {
     if (!user || (!inDm && !inHome)) {
       await interaction.reply({
         content: 'This command is not available for this user or channel.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
         allowedMentions: NO_MENTIONS,
       });
       return;
     }
 
     const histKey = this.historyKey(userId, interaction.channelId);
-    const ephemeral = inHome; // home channel replies are ephemeral
+    const flags = inHome ? MessageFlags.Ephemeral : undefined; // home channel replies are ephemeral
 
     switch (interaction.commandName) {
       case 'start':
@@ -517,7 +518,7 @@ class DiscordBotService {
             'Ask me to find or read documents in your Paperless archive, including follow-up questions. ' +
             'Send a PDF or photo to upload and classify it. Use `/clear` to forget this in-memory conversation.\n\n' +
             this.privacyText(),
-          ephemeral,
+          flags,
         });
         break;
 
@@ -525,12 +526,12 @@ class DiscordBotService {
         this.histories.delete(histKey);
         await interaction.reply({
           content: 'Conversation cleared. Nothing was stored in a database.',
-          ephemeral,
+          flags,
         });
         break;
 
       case 'privacy':
-        await interaction.reply({ content: this.privacyText(), ephemeral });
+        await interaction.reply({ content: this.privacyText(), flags });
         break;
 
       case 'actions':
@@ -538,11 +539,11 @@ class DiscordBotService {
           await interaction.reply({
             content:
               'Link this Discord user to a valid `householdId` and `memberId` in `DISCORD_USERS_JSON` to use the Action Center.',
-            ephemeral,
+            flags,
           });
           return;
         }
-        await interaction.deferReply({ ephemeral });
+        await interaction.deferReply({ flags });
         try {
           const actionCenter = require('../models/actionCenter');
           const actions = (actionCenter.listCases(user.householdId) as Record<string, unknown>[])
@@ -564,7 +565,7 @@ class DiscordBotService {
           for (const chunk of chunks.slice(1)) {
             await interaction.followUp({
               content: chunk,
-              ephemeral,
+              flags,
               allowedMentions: NO_MENTIONS,
             });
           }
@@ -574,7 +575,7 @@ class DiscordBotService {
         break;
 
       default:
-        await interaction.reply({ content: 'Unknown command.', ephemeral: true });
+        await interaction.reply({ content: 'Unknown command.', flags: MessageFlags.Ephemeral });
     }
   }
 
@@ -875,7 +876,7 @@ class DiscordBotService {
     if (!user || (!inDm && !inHome)) {
       await interaction.reply({
         content: 'You are not authorized to use this button.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -890,18 +891,18 @@ class DiscordBotService {
       if (originator !== userId) {
         await interaction.reply({
           content: 'This approval button belongs to another user.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
       if (!user.householdId || !user.memberId) {
         await interaction.reply({
           content: 'Approval requires a linked household account.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
-      await interaction.deferReply({ ephemeral: inHome });
+      await interaction.deferReply({ flags: inHome ? MessageFlags.Ephemeral : undefined });
       try {
         const actionCenter = require('../models/actionCenter');
         const decision = approvalMatch[1] === 'approve' ? 'approved' : 'rejected';
@@ -940,20 +941,20 @@ class DiscordBotService {
       if (originator !== userId) {
         await interaction.reply({
           content: 'This download button belongs to another user.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
       if (!this.downloadLimiter.tryConsume(userId)) {
         await interaction.reply({
           content: `You are downloading documents faster than this bot allows. Try again in ${this.downloadLimiter.retryAfterSeconds(userId)} seconds.`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
       const documentId = Number(docMatch[1]);
       // Home channel downloads must be ephemeral
-      await interaction.deferReply({ ephemeral: inHome });
+      await interaction.deferReply({ flags: inHome ? MessageFlags.Ephemeral : undefined });
       try {
         const file = await this.paperlessFor(user).downloadDocument(documentId);
         const maxDownloadBytes = Math.min(
@@ -983,7 +984,7 @@ class DiscordBotService {
       return;
     }
 
-    await interaction.reply({ content: 'Unknown button action.', ephemeral: true });
+    await interaction.reply({ content: 'Unknown button action.', flags: MessageFlags.Ephemeral });
   }
 
   // -------------------------------------------------------------------------

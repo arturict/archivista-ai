@@ -1,6 +1,7 @@
 import { promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
 import axios from 'axios';
+import { PAPERLESS_ACCEPT } from './paperlessApi';
 import { AzureOpenAI, OpenAI } from 'openai';
 import dotenv from 'dotenv';
 import { resolveDataDirectory } from './dataDirectory';
@@ -144,7 +145,8 @@ class SetupService {
       const response = await axios.get(`${baseUrl}/api/documents/`, {
         timeout: SETUP_VALIDATION_TIMEOUT_MS,
         headers: {
-          'Authorization': `Token ${token}`
+          'Authorization': `Token ${token}`,
+          Accept: PAPERLESS_ACCEPT
         }
       });
       return response.status === 200;
@@ -163,7 +165,8 @@ class SetupService {
           const response = await axios.get(`${baseUrl}/api/${endpoint}/`, {
             timeout: SETUP_VALIDATION_TIMEOUT_MS,
             headers: {
-              'Authorization': `Token ${token}`
+              'Authorization': `Token ${token}`,
+              Accept: PAPERLESS_ACCEPT
             }
           });
           console.log(`API permissions validated for ${endpoint}, ${response.status}`);

@@ -33,6 +33,7 @@ type Next = (error?: unknown) => unknown;
 const router = express.Router();
 const os = require('node:os');
 const axios = require('axios');
+const { PAPERLESS_ACCEPT, PAPERLESS_API_VERSION, MINIMUM_PAPERLESS_VERSION } = require('../services/paperlessApi');
 const setupService = require('../services/setupService.js');
 const paperlessService = require('../services/paperlessService.js');
 const { loadThumbnail, normalizeDocumentId } = require('../services/thumbnailHelper');
@@ -2262,7 +2263,8 @@ router.get('/manual/preview/:id', async (req: Req, res: Res) => {
       `${process.env.PAPERLESS_API_URL}/documents/${documentId}/`,
       {
         headers: {
-          'Authorization': `Token ${process.env.PAPERLESS_API_TOKEN}`
+          'Authorization': `Token ${process.env.PAPERLESS_API_TOKEN}`,
+          Accept: PAPERLESS_ACCEPT
         }
       }
     );
@@ -2516,7 +2518,7 @@ async function probePaperlessInstance(baseUrl: string, timeout = 2500, token = '
     timeout,
     validateStatus: () => true,
     maxRedirects: 0,
-    headers: { Accept: 'application/json', ...tokenHeader }
+    headers: { Accept: PAPERLESS_ACCEPT, ...tokenHeader }
   });
 
   try {
@@ -2525,6 +2527,21 @@ async function probePaperlessInstance(baseUrl: string, timeout = 2500, token = '
     const version = headers['x-version'] || null;
     const apiVersion = headers['x-api-version'] || null;
     const location = headers['location'] || '';
+
+    // A DRF 406 means the host speaks REST API versioning but not the version
+    // Tagvico pins, i.e. a Paperless-ngx release older than the supported minimum.
+    if (response.status === 406) {
+      return {
+        url,
+        ok: false,
+        status: 406,
+        version,
+        apiVersion,
+        requiresAuth: false,
+        authenticated: false,
+        error: `This Paperless-ngx instance does not support REST API version ${PAPERLESS_API_VERSION}. Tagvico requires Paperless-ngx ${MINIMUM_PAPERLESS_VERSION} or newer.`
+      };
+    }
 
     // Signal 1 + 4: header fingerprint or JSON resource listing.
     let looksLikePaperless = Boolean(
@@ -2685,11 +2702,14 @@ async function validatePaperlessTokenPermissions(baseUrl: string, token: string,
         timeout,
         validateStatus: () => true,
         headers: {
-          Accept: 'application/json',
+          Accept: PAPERLESS_ACCEPT,
           Authorization: `Token ${token}`
         }
       });
       if (response.status !== 200) {
+        if (response.status === 406) {
+          return { success: false, message: `Paperless-ngx rejected REST API version ${PAPERLESS_API_VERSION}. Tagvico requires Paperless-ngx ${MINIMUM_PAPERLESS_VERSION} or newer.` };
+        }
         return { success: false, message: `Token check failed at /api/${endpoint}/ with HTTP ${response.status}.` };
       }
     } catch (error) {

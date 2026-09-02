@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const discordBot = require('../dist/services/discordBotService');
+const { MessageFlags } = require('discord.js');
 const config = require('../dist/config/config');
 const { parseJsonObject, extractDocumentIds, cleanAnswerCitations, chunkDiscordText, chunkTelegramText,
   buildActionApprovalPayload } =
@@ -261,7 +262,7 @@ test('document button handler rejects a foreign user before Paperless access', a
     reply: async (value) => { reply = value; },
   });
   assert.match(reply.content, /another user/i);
-  assert.equal(reply.ephemeral, true);
+  assert.equal(reply.flags, MessageFlags.Ephemeral);
 });
 
 test('approval handler reports replayed decisions without executing them again', async () => {
@@ -454,7 +455,7 @@ test('unauthorized slash commands receive a controlled ephemeral response', asyn
     user: { id: '999999999999999999' }, channel: { type: 1 }, channelId: 'dm',
     commandName: 'start', reply: async (value) => { reply = value; },
   });
-  assert.equal(reply.ephemeral, true);
+  assert.equal(reply.flags, MessageFlags.Ephemeral);
   assert.match(reply.content, /not available/i);
 });
 

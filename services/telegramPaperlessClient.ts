@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PAPERLESS_ACCEPT } from './paperlessApi';
 
 type AxiosClient = ReturnType<typeof axios.create>;
 
@@ -86,7 +87,7 @@ export class TelegramPaperlessClient {
     this.webUrl = this.apiUrl.replace(/\/api$/i, '');
     this.client = axios.create({
       baseURL: this.apiUrl,
-      headers: { Authorization: `Token ${apiToken}` },
+      headers: { Authorization: `Token ${apiToken}`, Accept: PAPERLESS_ACCEPT },
       timeout: 60_000
     });
   }

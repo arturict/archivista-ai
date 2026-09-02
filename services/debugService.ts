@@ -1,6 +1,7 @@
 // service to debug the paperless-ngx api routes
 const env = require('dotenv').config();
 const axios = require('axios');
+const { PAPERLESS_ACCEPT } = require('./paperlessApi');
 const paperless_api = process.env.PAPERLESS_API_URL;
 const paperless_token = process.env.PAPERLESS_API_TOKEN;
 
@@ -11,6 +12,7 @@ const getDocuments = async () => {
         const response = await axios.get(`${paperless_api}/documents/`, {
             headers: {
           'Authorization': `Token ${paperless_token}`,
+          Accept: PAPERLESS_ACCEPT,
           'Content-Type': 'application/json'
             }
         });
@@ -27,6 +29,7 @@ const getTags = async () => {
         const response = await axios.get(`${paperless_api}/tags/`, {
             headers: {
           'Authorization': `Token ${paperless_token}`,
+          Accept: PAPERLESS_ACCEPT,
           'Content-Type': 'application/json'
             }
         });
@@ -43,6 +46,7 @@ const getCorrespondents = async () => {
         const response = await axios.get(`${paperless_api}/correspondents/`, {
             headers: {
           'Authorization': `Token ${paperless_token}`,
+          Accept: PAPERLESS_ACCEPT,
           'Content-Type': 'application/json'
             }
         });
